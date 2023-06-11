@@ -1,134 +1,75 @@
-# This file is a part of MonotonicSplines.jl, licensed under the MIT License (MIT).
-
-# The spline implemented here is described in https://arxiv.org/abs/1906.04032 .
-
-struct TrainableRQSpline <: Function
-    widths::AbstractMatrix{<:Real}
-    heights::AbstractMatrix{<:Real}
-    derivatives::AbstractMatrix{<:Real}
-end
-
-export TrainableRQSpline
-@functor TrainableRQSpline
+# This file is a part of EuclidianNormalizingFlows.jl, licensed under the MIT License (MIT).
+# The algorithm implemented here is described in https://arxiv.org/abs/1906.04032 
 
 struct RQSpline <: Function
-    widths::AbstractMatrix{<:Real}
-    heights::AbstractMatrix{<:Real}
-    derivatives::AbstractMatrix{<:Real}
+    widths::AbstractArray{<:Real}
+    heights::AbstractArray{<:Real}
+    derivatives::AbstractArray{<:Real}
 end
 
 export RQSpline
 @functor RQSpline
 
-struct TrainableRQSplineInv <: Function
-    widths::AbstractMatrix{<:Real}
-    heights::AbstractMatrix{<:Real}
-    derivatives::AbstractMatrix{<:Real}
-end
-
-@functor TrainableRQSplineInv
-export TrainableRQSplineInv
-
-struct RQSplineInv <: Function
-    widths::AbstractMatrix{<:Real}
-    heights::AbstractMatrix{<:Real}
-    derivatives::AbstractMatrix{<:Real}
-end
-
-@functor RQSplineInv
-export RQSplineInv
-
-
-Base.:(==)(a::TrainableRQSpline, b::TrainableRQSpline) = a.widths == b.widths && a.heights == b.heights && a.derivatives == b.derivatives
-
-Base.isequal(a::TrainableRQSpline, b::TrainableRQSpline) = isequal(a.widths, b.widths) && isequal(a.heights, b.heights) && isequal(a.derivatives, b.derivatives)
-
-Base.hash(x::TrainableRQSpline, h::UInt) = hash(x.widths, hash(x.heights, hash(x.derivatives, hash(:TrainableRQSpline, hash(:EuclidianNormalizingFlows, h)))))
-
-(f::TrainableRQSpline)(x::AbstractMatrix{<:Real}) = spline_forward(f, x)[1]
+(f::RQSpline)(x::AbstractMatrix{<:Real}) = spline_forward(f, x)[1]
 
 function ChangesOfVariables.with_logabsdet_jacobian(
-    f::TrainableRQSpline,
+    f::RQSpline,
     x::AbstractMatrix{<:Real}
 )
     return spline_forward(f, x)
 end
 
-function InverseFunctions.inverse(f::TrainableRQSpline)
-    return TrainableRQSplineInv(f.widths, f.heights, f.derivatives)
+
+struct RQSplineInv <: Function
+    widths::AbstractArray{<:Real}
+    heights::AbstractArray{<:Real}
+    derivatives::AbstractArray{<:Real}
 end
 
-Base.:(==)(a::TrainableRQSplineInv, b::TrainableRQSplineInv) = a.widths == b.widths && a.heights == b.heights && a.derivatives == b.derivatives
+@functor RQSplineInv
+export RQSplineInv
 
-Base.isequal(a::TrainableRQSplineInv, b::TrainableRQSplineInv) = isequal(a.widths, b.widths) && isequal(a.heights, b.heights) && isequal(a.derivatives, b.derivatives)
-
-Base.hash(x::TrainableRQSplineInv, h::UInt) = hash(x.widths, hash(x.heights, hash(x.derivatives, hash(:TrainableRQSplineInv, hash(:EuclidianNormalizingFlows, h)))))
-
-(f::TrainableRQSplineInv)(x::AbstractMatrix{<:Real}) = spline_backward(f, x)[1]
+(f::RQSplineInv)(x::AbstractMatrix{<:Real}) = spline_backward(f, x)[1]
 
 function ChangesOfVariables.with_logabsdet_jacobian(
-    f::TrainableRQSplineInv,
+    f::RQSplineInv,
     x::AbstractMatrix{<:Real}
 )
     return spline_backward(f, x)
 end
 
-function InverseFunctions.inverse(f::TrainableRQSplineInv)
-    return TrainableRQSpline(f.widths, f.heights, f.derivatives)
-end
-
 # Transformation forward: 
-
-function spline_forward(trafo::TrainableRQSpline, x::AbstractMatrix{<:Real}; B=5.)
-
-    @assert size(trafo.widths, 1) == size(trafo.heights, 1) == size(trafo.derivatives, 1) == size(x, 1) >= 1
-    @assert size(trafo.widths, 2) == size(trafo.heights, 2) == (size(trafo.derivatives, 2) + 1) >= 2
-
-    ndims = size(x, 1)
-
-    w = _cumsum(_softmax(trafo.widths))
-    h = _cumsum(_softmax(trafo.heights))
-    d = _softplus(trafo.derivatives)
-
-    w = hcat(repeat([-B,], ndims,1), w)
-    h = hcat(repeat([-B,], ndims,1), h)
-    d = hcat(repeat([1,], ndims,1), d)
-    d = hcat(d, repeat([1,], ndims,1))
-
-    return spline_forward(RQSpline(w,h,d), x)
-end
 
 function spline_forward(trafo::RQSpline, x::AbstractMatrix{<:Real})
     return spline_forward(x, trafo.widths, trafo.heights, trafo.derivatives, trafo.widths, trafo.heights, trafo.derivatives)
 end
 
 function spline_forward(
-    x::AbstractArray{M0},
-    w::AbstractArray{M1},
-    h::AbstractArray{M2},
-    d::AbstractArray{M3},
-    w_logJac::AbstractArray{M4},
-    h_logJac::AbstractArray{M5},
-    d_logJac::AbstractArray{M6}
-) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
+        x::AbstractArray{M0},
+        w::AbstractArray{M1},
+        h::AbstractArray{M2},
+        d::AbstractArray{M3},
+        w_logJac::AbstractArray{M4},
+        h_logJac::AbstractArray{M5},
+        d_logJac::AbstractArray{M6} 
+    ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
 
     T = promote_type(M0, M1, M2, M3, M4, M5, M6)
-
-    ndims = size(x, 1)
-    nsmpls = size(x, 2)
-
-    y = zeros(T, ndims, nsmpls)
-    logJac = zeros(T, ndims, nsmpls)
+    ndims, nsmpls = size(x)
 
     device = KernelAbstractions.get_device(x)
-    n = device isa GPU ? 256 : 4
+    n = device isa GPU ? 256 : Threads.nthreads()
     kernel! = spline_forward_kernel!(device, n)
+
+    y = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
+    logJac = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
 
     ev = kernel!(x, y, logJac, w, h, d, ndrange=size(x))
 
     wait(ev)
+    logJac = sum(logJac, dims=1)
 
-    return y, sum(logJac, dims=1)
+    return y, logJac
 end
 
 
@@ -140,28 +81,30 @@ function spline_forward_pullback(
         w_logJac::AbstractArray{M4},
         h_logJac::AbstractArray{M5},
         d_logJac::AbstractArray{M6},
-        tangent::ChainRulesCore.Tangent;
+        tangent_1::AbstractArray,
+        tangent_2::AbstractArray;
     ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
 
     T = promote_type(M0, M1, M2, M3, M4, M5, M6)
 
     ndims = size(x, 1)
     nsmpls = size(x, 2)
-    nparams = size(w, 2) 
-
-    y = zeros(T, ndims, nsmpls)
-    logJac = zeros(T, ndims, nsmpls)
-
-    ∂y∂w = zeros(T, ndims, nparams)
-    ∂y∂h = zeros(T, ndims, nparams)
-    ∂y∂d = zeros(T, ndims, nparams+1)
-
-    ∂LogJac∂w = zeros(T, ndims, nparams)
-    ∂LogJac∂h = zeros(T, ndims, nparams)
-    ∂LogJac∂d = zeros(T, ndims, nparams+1)
+    nparams = size(w, 1)
 
     device = KernelAbstractions.get_device(x)
-    n = device isa GPU ? 256 : 4
+    n = device isa GPU ? 256 : Threads.nthreads()
+
+    y = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
+    logJac = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
+
+    ∂y∂w = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
+    ∂y∂h = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
+    ∂y∂d = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
+
+    ∂LogJac∂w = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
+    ∂LogJac∂h = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
+    ∂LogJac∂d = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
+
     kernel! = spline_forward_pullback_kernel!(device, n)
 
     ev = kernel!(
@@ -169,14 +112,16 @@ function spline_forward_pullback(
         w, h, d,
         ∂y∂w, ∂y∂h, ∂y∂d,
         ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d, 
-        tangent,
+        tangent_1,
+        tangent_2,
         ndrange=size(x)
         )
 
     wait(ev)
+
     logJac = sum(logJac, dims=1)
 
-    return NoTangent(), @thunk(tangent[1] .* exp.(logJac)), ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d
+    return NoTangent(), @thunk(tangent_1 .* exp.(logJac)), ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d
 end
 
 @kernel function spline_forward_kernel!(
@@ -189,21 +134,21 @@ end
 )
     i, j = @index(Global, NTuple)
 
-    K = size(w, 2)
+    K = size(w, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(w[i,:], x[i,j]) - 1
+    k1 = searchsortedfirst_impl(view(w, :, i, j), x[i,j]) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
-    isinside = (k1 < K) && (k1 > 0)
+    isinside = (1 <= k1 <= K)
     k = Base.ifelse(isinside, k1, k2)
 
-    x_tmp = Base.ifelse(isinside, x[i,j], w[i,k]) # Simplifies calculations
-    (yᵢⱼ, LogJacᵢⱼ) = eval_forward_spline_params(w[i,k], w[i,k+1], h[i,k], h[i,k+1], d[i,k], d[i,k+1], x_tmp)
+    x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j]) # Simplifies calculations
+    (yᵢⱼ, LogJacᵢⱼ) = eval_forward_spline_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
-    logJac[i, j] += Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
+    logJac[i, j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
 end
 
 
@@ -220,47 +165,42 @@ end
         ∂LogJac∂w_tangent::AbstractArray,
         ∂LogJac∂h_tangent::AbstractArray,
         ∂LogJac∂d_tangent::AbstractArray,
-        tangent::ChainRulesCore.Tangent
+        tangent_1::AbstractArray,
+        tangent_2::AbstractArray,
     )
 
     i, j = @index(Global, NTuple)
 
-    K = size(w, 2)
+    # minus one is to account for left pad
+    K = size(w, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(w[i,:], x[i,j]) - 1
+    k1 = searchsortedfirst_impl(view(w, :, i, j), x[i,j]) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
-    isinside = (k1 < K) && (k1 > 0)
+    isinside = (1 <= k1 <= K)
     k = Base.ifelse(isinside, k1, k2)
 
-    x_tmp = Base.ifelse(isinside, x[i,j], w[i,k]) # Simplifies calculations
-    (yᵢⱼ, LogJacᵢⱼ, ∂y∂wₖ, ∂y∂hₖ, ∂y∂dₖ, ∂LogJac∂wₖ, ∂LogJac∂hₖ, ∂LogJac∂dₖ) = eval_forward_spline_params_with_grad(w[i,k], w[i,k+1], h[i,k], h[i,k+1], d[i,k], d[i,k+1], x_tmp)
+    x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j]) # Simplifies calculations
+    (yᵢⱼ, LogJacᵢⱼ, ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d) = eval_forward_spline_params_with_grad(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
-    logJac[i, j] += Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
+    logJac[i,j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
 
-    left_edge_istrue = (1 < k < K)
-    left_edge_ind = Base.ifelse(left_edge_istrue, k-1, one(typeof(k)))
+    ∂y∂w_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂w[1], zero(eltype(∂y∂w)))
+    ∂y∂h_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂h[1], zero(eltype(∂y∂h)))
+    ∂y∂d_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂d[1], zero(eltype(∂y∂d)))
+    ∂LogJac∂w_tangent[k, i, j] = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂w[1], zero(eltype(∂LogJac∂w)))
+    ∂LogJac∂h_tangent[k, i, j] = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂h[1], zero(eltype(∂LogJac∂h)))
+    ∂LogJac∂d_tangent[k, i, j] = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂d[1], zero(eltype(∂LogJac∂d)))
 
-    @atomic ∂y∂w_tangent[i, left_edge_ind+1]      += tangent[1][i,j] * Base.ifelse(isinside * left_edge_istrue, ∂y∂wₖ[1], zero(eltype(∂y∂wₖ)))
-    @atomic ∂y∂h_tangent[i, left_edge_ind+1]      += tangent[1][i,j] * Base.ifelse(isinside * left_edge_istrue, ∂y∂hₖ[1], zero(eltype(∂y∂hₖ)))
-    @atomic ∂y∂d_tangent[i, left_edge_ind+1]      += tangent[1][i,j] * Base.ifelse(isinside * left_edge_istrue, ∂y∂dₖ[1], zero(eltype(∂y∂dₖ)))
-    @atomic ∂LogJac∂w_tangent[i, left_edge_ind+1] += tangent[2][1,j] * Base.ifelse(isinside * left_edge_istrue, ∂LogJac∂wₖ[1], zero(eltype(∂LogJac∂wₖ)))
-    @atomic ∂LogJac∂h_tangent[i, left_edge_ind+1] += tangent[2][1,j] * Base.ifelse(isinside * left_edge_istrue, ∂LogJac∂hₖ[1], zero(eltype(∂LogJac∂hₖ)))
-    @atomic ∂LogJac∂d_tangent[i, left_edge_ind+1] += tangent[2][1,j] * Base.ifelse(isinside * left_edge_istrue, ∂LogJac∂dₖ[1], zero(eltype(∂LogJac∂dₖ)))
- 
-    right_edge_istrue = (k < K - 1)
-    right_edge_ind = Base.ifelse(right_edge_istrue, k, one(typeof(k)))
-
-    @atomic ∂y∂w_tangent[i, right_edge_ind+1]       += tangent[1][i,j] * Base.ifelse(isinside * right_edge_istrue, ∂y∂wₖ[2], zero(eltype(∂y∂wₖ)))
-    @atomic ∂y∂h_tangent[i, right_edge_ind+1]       += tangent[1][i,j] * Base.ifelse(isinside * right_edge_istrue, ∂y∂hₖ[2], zero(eltype(∂y∂hₖ)))
-    @atomic ∂y∂d_tangent[i, right_edge_ind+1]       += tangent[1][i,j] * Base.ifelse(isinside * right_edge_istrue, ∂y∂dₖ[2], zero(eltype(∂y∂dₖ)))
-    @atomic ∂LogJac∂w_tangent[i, right_edge_ind+1]  += tangent[2][1,j] * Base.ifelse(isinside * right_edge_istrue, ∂LogJac∂wₖ[2], zero(eltype(∂LogJac∂wₖ)))
-    @atomic ∂LogJac∂h_tangent[i, right_edge_ind+1]  += tangent[2][1,j] * Base.ifelse(isinside * right_edge_istrue, ∂LogJac∂hₖ[2], zero(eltype(∂LogJac∂hₖ)))
-    @atomic ∂LogJac∂d_tangent[i, right_edge_ind+1]  += tangent[2][1,j] * Base.ifelse(isinside * right_edge_istrue, ∂LogJac∂dₖ[2], zero(eltype(∂LogJac∂dₖ)))
-
+    ∂y∂w_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂w[2], zero(eltype(∂y∂w)))
+    ∂y∂h_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂h[2], zero(eltype(∂y∂h)))
+    ∂y∂d_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂d[2], zero(eltype(∂y∂d)))
+    ∂LogJac∂w_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂w[2], zero(eltype(∂LogJac∂w)))
+    ∂LogJac∂h_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂h[2], zero(eltype(∂LogJac∂h)))
+    ∂LogJac∂d_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂d[2], zero(eltype(∂LogJac∂d))) # account for right pad in d?
 end
 
 function ChainRulesCore.rrule(
@@ -274,9 +214,9 @@ function ChainRulesCore.rrule(
     d_logJac::AbstractArray{M6};
 ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
 
-    # To do: Rewrite to avoid repeating calculation. 
     y, logJac = spline_forward(x, w, h, d, w_logJac, h_logJac, d_logJac)
-    pullback(tangent) = spline_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, tangent)
+    device = KernelAbstractions.get_device(x)
+    pullback(tangent) = device isa GPU ? spline_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, gpu(tangent[1]), gpu(tangent[2])) : spline_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, tangent[1], tangent[2])
     return (y, logJac), pullback
 end
 
@@ -374,27 +314,10 @@ end
 
 # Transformation backward: 
 
-function spline_backward(trafo::TrainableRQSplineInv, x::AbstractMatrix{<:Real};   B = 5.)
-
-    @assert size(trafo.widths, 1) == size(trafo.heights, 1) == size(trafo.derivatives, 1) == size(x, 1)  >= 1
-    @assert size(trafo.widths, 2) == size(trafo.heights, 2) == (size(trafo.derivatives, 2) + 1)  >= 2
-
-    ndims = size(x, 1)
-
-    w = _cumsum(_softmax(trafo.widths))
-    h = _cumsum(_softmax(trafo.heights))
-    d = _softplus(trafo.derivatives)
-
-    w = hcat(repeat([-B,], ndims,1), w)
-    h = hcat(repeat([-B,], ndims,1), h)
-    d = hcat(repeat([1,], ndims,1), d)
-    d = hcat(d, repeat([1,], ndims,1))
-
-    return spline_backward(RQSplineInv(w, h, d), x)
-end
 
 function spline_backward(trafo::RQSplineInv, x::AbstractMatrix{<:Real})
     return spline_backward(x, trafo.widths, trafo.heights, trafo.derivatives)
+
 end
 
 
@@ -402,51 +325,50 @@ function spline_backward(
         x::AbstractArray{M0},
         w::AbstractArray{M1},
         h::AbstractArray{M2},
-        d::AbstractArray{M3},
+        d::AbstractArray{M3}
     ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
-
+    
     T = promote_type(M0, M1, M2, M3)
-
-    ndims = size(x, 1)
-    nsmpls = size(x, 2)
-
-    y = zeros(T, ndims, nsmpls)
-    logJac = zeros(T, ndims, nsmpls)
+    ndims, nsmpls = size(x)
 
     device = KernelAbstractions.get_device(x)
-    n = device isa GPU ? 256 : 4
+    n = device isa GPU ? 256 : Threads.nthreads()
     kernel! = spline_backward_kernel!(device, n)
+
+    y = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
+    logJac = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
 
     ev = kernel!(x, y, logJac, w, h, d, ndrange=size(x))
 
     wait(ev)
+    logJac = sum(logJac, dims=1)
 
-    return y, sum(logJac, dims=1)
+    return y, logJac
 end
 
 @kernel function spline_backward_kernel!(
-        x::AbstractMatrix{M0},
-        y::AbstractMatrix{M1},
-        logJac::AbstractMatrix{M2},
-        w::AbstractMatrix{M3},
-        h::AbstractMatrix{M4},
-        d::AbstractMatrix{M5}
-    ) where {M0<:Real, M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real,}
+        x::AbstractArray,
+        y::AbstractArray,
+        logJac::AbstractArray,
+        w::AbstractArray,
+        h::AbstractArray,
+        d::AbstractArray
+    ) 
 
     i, j = @index(Global, NTuple)
     
-    K = size(w, 2)
+    K = size(w, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(h[i,:], x[i,j]) - 1
+    k1 = searchsortedfirst_impl(view(h, :, i, j), x[i,j]) - 1
     k2 = one(typeof(k1))
 
-   # Is inside of range
-   isinside = (k1 < K) && (k1 > 0)
-   k = Base.ifelse(isinside, k1, k2)
+    # Is inside of range
+    isinside = (k1 < K) && (k1 > 0)
+    k = Base.ifelse(isinside, k1, k2)
 
-    x_tmp = Base.ifelse(isinside, x[i,j], h[i,k]) # Simplifies unnecessary calculations
-    (yᵢⱼ, LogJacᵢⱼ) = eval_backward_spline_params(w[i,k], w[i,k+1], h[i,k], h[i,k+1], d[i,k], d[i,k+1], x_tmp)
+    x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j])  # Simplifies unnecessary calculations
+    (yᵢⱼ, LogJacᵢⱼ) = eval_backward_spline_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
     logJac[i, j] += Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
@@ -482,66 +404,4 @@ function eval_backward_spline_params(
     LogJac = log(abs(Δx * grad)) - 2*log(abs(denom))
 
     return y, LogJac
-end
-
-# Utils: 
-
-function _softmax(x::AbstractVector)
-
-    exp_x = exp.(x)
-    sum_exp_x = sum(exp_x)
-
-    return exp_x ./ sum_exp_x 
-end
-
-function _softmax(x::AbstractMatrix)
-
-    val = cat([_softmax(i) for i in eachrow(x)]..., dims=2)'
-
-    return val 
-end
-
-function _cumsum(x::AbstractVector; B = 5)
-    return 2 .* B .* cumsum(x) .- B 
-end
-
-function _cumsum(x::AbstractMatrix)
-
-    return cat([_cumsum(i) for i in eachrow(x)]..., dims=2)'
-end
-
-function _softplus(x::AbstractVector)
-
-    return log.(exp.(x) .+ 1) 
-end
-
-function _softplus(x::AbstractMatrix)
-
-    val = cat([_softplus(i) for i in eachrow(x)]..., dims=2)'
-
-    return val
-end
-
-midpoint(lo::T, hi::T) where T<:Integer = lo + ((hi - lo) >>> 0x01)
-binary_log(x::T) where {T<:Integer} = 8 * sizeof(T) - leading_zeros(x - 1)
-
-function searchsortedfirst_impl(
-        v::AbstractVector, 
-        x::Real
-    )
-    
-    u = one(Integer)
-    lo = one(Integer) - u
-    hi = length(v) + u
-    
-    n = binary_log(length(v))+1
-    m = one(Integer)
-    
-    @inbounds for i in 1:n
-        m_1 = midpoint(lo, hi)
-        m = Base.ifelse(lo < hi - u, m_1, m)
-        lo = Base.ifelse(v[m] < x, m, lo)
-        hi = Base.ifelse(v[m] < x, hi, m)
-    end
-    return hi
 end
