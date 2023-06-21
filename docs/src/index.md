@@ -1,6 +1,6 @@
 # MonotonicSplines.jl
 
-A package implementing monotonous spline function for applications in spline-based approaches to Normalizing FLows [(Wikipedia)](https://en.wikipedia.org/wiki/Flow-based_generative_model).
+A package implementing monotonoic spline functions for applications in spline-based approaches to Normalizing FLows [(Wikipedia)](https://en.wikipedia.org/wiki/Flow-based_generative_model).
 
 This package currently includes the *monotonous rational quadratic splines* as defined in ["Neural Spline Flows, Durkan et al. 2019"](https://arxiv.org/abs/1906.04032).
 
@@ -13,6 +13,6 @@ This package was created with high performance as the overall goal and features 
 ---
 
 ```@contents
-Pages = ["introduction.md","guide.md"]
+Pages = ["introduction.md","implementation.md"]
 Depth = 3
 ```
