@@ -57,7 +57,7 @@ function spline_forward(
     T = promote_type(M0, M1, M2, M3, M4, M5, M6)
     ndims, nsmpls = size(x)
 
-    device = KernelAbstractions.get_device(x)
+    device = KernelAbstractions.get_backend(x)
     n = device isa GPU ? 256 : Threads.nthreads()
     kernel! = spline_forward_kernel!(device, n)
 
@@ -91,7 +91,7 @@ function spline_forward_pullback(
     nsmpls = size(x, 2)
     nparams = size(w, 1)
 
-    device = KernelAbstractions.get_device(x)
+    device = KernelAbstractions.get_backend(x)
     n = device isa GPU ? 256 : Threads.nthreads()
 
     y = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
@@ -215,7 +215,7 @@ function ChainRulesCore.rrule(
 ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
 
     y, logJac = spline_forward(x, w, h, d, w_logJac, h_logJac, d_logJac)
-    device = KernelAbstractions.get_device(x)
+    device = KernelAbstractions.get_backend(x)
     pullback(tangent) = device isa GPU ? spline_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, gpu(tangent[1]), gpu(tangent[2])) : spline_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, tangent[1], tangent[2])
     return (y, logJac), pullback
 end
@@ -331,7 +331,7 @@ function spline_backward(
     T = promote_type(M0, M1, M2, M3)
     ndims, nsmpls = size(x)
 
-    device = KernelAbstractions.get_device(x)
+    device = KernelAbstractions.get_backend(x)
     n = device isa GPU ? 256 : Threads.nthreads()
     kernel! = spline_backward_kernel!(device, n)
 

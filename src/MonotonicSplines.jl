@@ -18,9 +18,10 @@ import InverseFunctions
 import Functors
 using Functors: @functor
 
-import KernelAbstractions
-using KernelAbstractions: @kernel, @index, @atomic
+using KernelAbstractions
 
 include("rqspline.jl")
+include("utils.jl")
+
 
 end # module
