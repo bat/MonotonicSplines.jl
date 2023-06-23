@@ -34,25 +34,28 @@ to use the functions the package provides.
 
 ## Example usage for rational quadratic spline functions
 
+Obtain `widths`, `heights`, and `derivatives` parameters to characterize a set of rational quadratic spline functions after the parameterization described in ["Neural Spline Flows, Durkan et al."](https://arxiv.org/abs/1906.04032):
 ```Julia
 julia> widths, heights, derivatives = get_params(params_raw, n_dims_to_transform) 
 ```
-Obtain `widths`, `heights`, and `derivatives` parameters to characterize a set of rational quadratic spline functions after the parameterization described in ["Neural Spline Flows, Durkan et al. 2019"](https://arxiv.org/abs/1906.04032).
-`params_raw` is in general the output of a neural net, applied to a set of samples, and has the shape of a ``3(K-1) \cdot n_dims_to_transform \times n_samples`` -matrix. 
+`params_raw` is in general the output of a neural net, applied to a set of samples, and has the shape of a ``3(K-1) *n_dims_to_transform x n_samples`` -matrix.
+
 Here, `K` is the number of spline segments in the rational quadratic spline functions, `n_dims_to_transform` is the number of spline functions per sample (i.e. the number of components of a sample that are supposed to be transformed via a spline function) and `n_samples` is the number of samples. 
+
 One column of this matrix `params_raw` is then the output of the neural net, with one sample vector `x` as the input, and will be processed into the spline parameters to characterize the rational quadratic spline functions used to transform the desired `n_dims_to_transform` components of the input sample `x`.
 
 ```Julia
 julia> rqs_splines = RQSpline(widths, heights, derivatives)
 ```
-Create `RQSpline` object, holding the parameters to characterize ``n_dims_to_transform \times n_samples`` spline functions.
+Create `RQSpline` object, holding the parameters to characterize ``n_dims_to_transform x n_samples`` spline functions.
 
 ```Julia
 julia> Y = rqs_splines(X)
 ```
-Apply the rational quadratic spline functions to the matrix ``n_dims_to_transform \times n_samples`` `X`. One column in `X` corresponds to a single sample. 
+Apply the rational quadratic spline functions to the matrix ``n_dims_to_transform x n_samples`` `X`. One column in `X` corresponds to a single sample. 
+
 Note that if you have a set of samples `S` of which you wish to transform `n_dims_to_transform` components each, only apply `rqs_splines` to the partial sample set `X`, with only the `n_dims_to_transform` components of each sample that are supposed to be transformed.
 
-`Y` is a ``n_dims_to_transform \times n_samples`` matrix, where the ``i,j`` -th component is the transformed value of the ``i,j`` -th entry in `X`. 
+`Y` is a ``n_dims_to_transform x n_samples`` matrix, where the ``i,j`` -th component is the transformed value of the ``i,j`` -th entry in `X`. 
 
 For details of the implementation, see the [Documentation for stable version](https://bat.github.io/MonotonicSplines.jl/stable).
