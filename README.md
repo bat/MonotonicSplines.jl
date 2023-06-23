@@ -7,7 +7,12 @@
 [![Codecov](https://codecov.io/gh/bat/MonotonicSplines.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/bat/MonotonicSplines.jl)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
-A package implementing monotonoic spline functions for applications in spline-based approaches to Normalizing FLows [(Wikipedia)](https://en.wikipedia.org/wiki/Flow-based_generative_model).
+
+This package provides high-performance, GPU- and
+[AD](https://en.wikipedia.org/wiki/Automatic_differentiation)-friendly
+monotonic spline functions in Julia for use in
+[Normalizing Flows](https://en.wikipedia.org/wiki/Flow-based_generative_model),
+resp. parameter transformations in general.
 
 This package currently includes the *monotonic rational quadratic splines* as defined in ["Neural Spline Flows, Durkan et al. 2019"](https://arxiv.org/abs/1906.04032).
 
@@ -20,6 +25,8 @@ This package was created with high performance as the overall goal and features 
 
 ## Installation
 
+
+Please see the Documentation linked above for details.
 To install `MonotonicSplines.jl`, start Julia and run 
 
 ```Julia
