@@ -64,11 +64,11 @@ Apply the rational quadratic spline functions characterized by the parameters st
 The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
 """
 function spline_forward(trafo::RQSpline, x::AbstractMatrix{<:Real})
-    return spline_forward(x, trafo.widths, trafo.heights, trafo.derivatives, trafo.widths, trafo.heights, trafo.derivatives)
+    return rqs_forward(x, trafo.widths, trafo.heights, trafo.derivatives, trafo.widths, trafo.heights, trafo.derivatives)
 end
 
 """
-    spline_forward(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, w_logJac::AbstractArray{<:Real}, h_logJac::AbstractArray{<:Real}, d_logJac::AbstractArray{<:Real})
+    rqs_forward(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, w_logJac::AbstractArray{<:Real}, h_logJac::AbstractArray{<:Real}, d_logJac::AbstractArray{<:Real})
 
 Apply the rational quadratic spline functions characterized by `w`, `h`, and `d` to `x`. 
 The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
@@ -78,7 +78,7 @@ of the logarithm of the absolute values of the determinant of the jacobians of t
 
 The function executes in a kernel, on the same backend as `x` is stored (CPU or GPU), the output will also be returned on the same backend.
 """
-function spline_forward(
+function rqs_forward(
         x::AbstractArray{M0},
         w::AbstractArray{M1},
         h::AbstractArray{M2},
@@ -93,7 +93,7 @@ function spline_forward(
 
     device = KernelAbstractions.get_backend(x)
     n = device isa GPU ? 256 : Threads.nthreads()
-    kernel! = spline_forward_kernel!(device, n)
+    kernel! = rqs_forward_kernel!(device, n)
 
     y = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
     logJac = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
@@ -106,12 +106,12 @@ function spline_forward(
 end
 
 """
-    spline_forward_pullback(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, w_logJac::AbstractArray{<:Real}, h_logJac::AbstractArray{<:Real}, d_logJac::AbstractArray{<:Real}, tangent_1::AbstractArray, tangent_2::AbstractArray)
+    rqs_forward_pullback(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, w_logJac::AbstractArray{<:Real}, h_logJac::AbstractArray{<:Real}, d_logJac::AbstractArray{<:Real}, tangent_1::AbstractArray, tangent_2::AbstractArray)
 
 Return the gradients of the spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x`.
 The output will be on the same backend as `x` and `w`, `h`, and `d` (CPU or GPU).
 """
-function spline_forward_pullback(
+function rqs_forward_pullback(
         x::AbstractArray{M0},
         w::AbstractArray{M1},
         h::AbstractArray{M2},
@@ -143,7 +143,7 @@ function spline_forward_pullback(
     ∂LogJac∂h = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
     ∂LogJac∂d = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
 
-    kernel! = spline_forward_pullback_kernel!(device, n)
+    kernel! = rqs_forward_pullback_kernel!(device, n)
 
     kernel!(
         x, y, logJac, 
@@ -160,8 +160,8 @@ function spline_forward_pullback(
     return NoTangent(), @thunk(tangent_1 .* exp.(logJac)), ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d
 end
 
-"""
-    spline_forward_kernel!(x::AbstractArray, y::AbstractArray, logJac::AbstractArray, w::AbstractArray, h::AbstractArray, d::AbstractArray)
+""" 
+    rqs_forward_kernel!(x::AbstractArray, y::AbstractArray, logJac::AbstractArray, w::AbstractArray, h::AbstractArray, d::AbstractArray)
 
 Apply the rational quadratic spline functions characterized by `w`, `h`, and `d` to `x`. 
 The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
@@ -171,7 +171,7 @@ of the jacobians of the spline functions applied to a column of `x` are stored i
 
 To find the bin `k` in which the respective x value for a spline falls in, a the corresponding column of `w` is searched.j
 """
-@kernel function spline_forward_kernel!(
+@kernel function rqs_forward_kernel!(
     x::AbstractArray,
     y::AbstractArray,
     logJac::AbstractArray,
@@ -192,14 +192,14 @@ To find the bin `k` in which the respective x value for a spline falls in, a the
     k = Base.ifelse(isinside, k1, k2)
 
     x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j]) # Simplifies calculations
-    (yᵢⱼ, LogJacᵢⱼ) = eval_forward_spline_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
+    (yᵢⱼ, LogJacᵢⱼ) = eval_forward_rqs_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
     logJac[i, j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
 end
 
 """
-    spline_forward_pullback_kernel!(
+    rqs_forward_pullback_kernel!(
         x::AbstractArray,
         y::AbstractArray,
         logJac::AbstractArray,
@@ -215,10 +215,10 @@ end
         tangent_1::AbstractArray,
         tangent_2::AbstractArray,
     )
-Return the gradients of the spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x` and of `logJac`.
+Return the gradients of the rational quadratic spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x` and of `logJac`.
 The output will be on the same backend as `x` and `w`, `h`, and `d` (CPU or GPU).
 """
-@kernel function spline_forward_pullback_kernel!(
+@kernel function rqs_forward_pullback_kernel!(
         x::AbstractArray,
         y::AbstractArray,
         logJac::AbstractArray,
@@ -249,7 +249,7 @@ The output will be on the same backend as `x` and `w`, `h`, and `d` (CPU or GPU)
     k = Base.ifelse(isinside, k1, k2)
 
     x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j]) # Simplifies calculations
-    (yᵢⱼ, LogJacᵢⱼ, ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d) = eval_forward_spline_params_with_grad(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
+    (yᵢⱼ, LogJacᵢⱼ, ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d) = eval_forward_rqs_params_with_grad(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
     logJac[i,j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
@@ -270,7 +270,7 @@ The output will be on the same backend as `x` and `w`, `h`, and `d` (CPU or GPU)
 end
 
 function ChainRulesCore.rrule(
-    ::typeof(spline_forward),
+    ::typeof(rqs_forward),
     x::AbstractArray{M0},
     w::AbstractArray{M1},
     h::AbstractArray{M2},
@@ -280,18 +280,18 @@ function ChainRulesCore.rrule(
     d_logJac::AbstractArray{M6};
 ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
 
-    y, logJac = spline_forward(x, w, h, d, w_logJac, h_logJac, d_logJac)
+    y, logJac = rqs_forward(x, w, h, d, w_logJac, h_logJac, d_logJac)
     device = KernelAbstractions.get_backend(x)
-    pullback(tangent) = device isa GPU ? spline_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, gpu(tangent[1]), gpu(tangent[2])) : spline_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, tangent[1], tangent[2])
+    pullback(tangent) = device isa GPU ? rqs_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, gpu(tangent[1]), gpu(tangent[2])) : rqs_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, tangent[1], tangent[2])
     return (y, logJac), pullback
 end
 
 """
-    eval_forward_spline_params(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
+    eval_forward_rqs_params(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
 
 Apply a rational quadratic spline segment to `x`, and calculate the logarithm of the absolute value of this function's jacobian.
 """
-function eval_forward_spline_params(
+function eval_forward_rqs_params(
     wₖ::Real, wₖ₊₁::Real, 
     hₖ::Real, hₖ₊₁::Real, 
     dₖ::Real, dₖ₊₁::Real, 
@@ -317,12 +317,12 @@ function eval_forward_spline_params(
 end
 
 """
-    eval_forward_spline_params_with_grad(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
+    eval_forward_rqs_params_with_grad(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
 
 Apply a rational quadratic spline segment to `x`, and calculate the logarithm of the absolute value of this function's jacobian.
 And calculate the gradient of that function depending on the spline parameters.
 """
-function eval_forward_spline_params_with_grad(
+function eval_forward_rqs_params_with_grad(
     wₖ::M0, wₖ₊₁::M0, 
     hₖ::M1, hₖ₊₁::M1, 
     dₖ::M2, dₖ₊₁::M2, 
@@ -392,18 +392,18 @@ end
 # Transformation backward: 
 
 """
-    spline_backward(trafo::RQSplineInv, x::AbstractMatrix{<:Real})
+    rqs_backward(trafo::RQSplineInv, x::AbstractMatrix{<:Real})
 
 Apply the inverse rational quadratic spline functions characterized by the parameters stored in `trafo` to the matrix `x`.
-The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
+The rational quadratic spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
 """
 function spline_backward(trafo::RQSplineInv, x::AbstractMatrix{<:Real})
-    return spline_backward(x, trafo.widths, trafo.heights, trafo.derivatives)
+    return rqs_backward(x, trafo.widths, trafo.heights, trafo.derivatives)
 
 end
 
 """
-    spline_backward(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, w_logJac::AbstractArray{<:Real}, h_logJac::AbstractArray{<:Real}, d_logJac::AbstractArray{<:Real})
+    rqs_backward(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, w_logJac::AbstractArray{<:Real}, h_logJac::AbstractArray{<:Real}, d_logJac::AbstractArray{<:Real})
 
 Apply the inverse rational quadratic spline functions characterized by `w`, `h`, and `d` to `x`. 
 The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
@@ -413,7 +413,7 @@ of the logarithm of the absolute values of the determinant of the jacobians of t
 
 The function executes in a kernel, on the same backend as `x` is stored (CPU or GPU), the output will also be returned on the same backend.
 """
-function spline_backward(
+function rqs_backward(
         x::AbstractArray{M0},
         w::AbstractArray{M1},
         h::AbstractArray{M2},
@@ -425,7 +425,7 @@ function spline_backward(
 
     device = KernelAbstractions.get_backend(x)
     n = device isa GPU ? 256 : Threads.nthreads()
-    kernel! = spline_backward_kernel!(device, n)
+    kernel! = rqs_backward_kernel!(device, n)
 
     y = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
     logJac = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
@@ -437,7 +437,7 @@ function spline_backward(
     return y, logJac
 end
 
-@kernel function spline_backward_kernel!(
+@kernel function rqs_backward_kernel!(
         x::AbstractArray,
         y::AbstractArray,
         logJac::AbstractArray,
@@ -459,13 +459,13 @@ end
     k = Base.ifelse(isinside, k1, k2)
 
     x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j])  # Simplifies unnecessary calculations
-    (yᵢⱼ, LogJacᵢⱼ) = eval_backward_spline_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
+    (yᵢⱼ, LogJacᵢⱼ) = eval_backward_rqs_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
     logJac[i, j] += Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
 end
 
-function eval_backward_spline_params(
+function eval_backward_rqs_params(
     wₖ::M0, wₖ₊₁::M0, 
     hₖ::M1, hₖ₊₁::M1, 
     dₖ::M2, dₖ₊₁::M2, 

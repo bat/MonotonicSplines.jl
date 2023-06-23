@@ -10,7 +10,7 @@ module MonotonicSplines
 using LinearAlgebra
 
 import ChainRulesCore
-using ChainRulesCore: @thunk
+using ChainRulesCore
 
 import ChangesOfVariables
 import InverseFunctions
@@ -20,10 +20,9 @@ using Functors: @functor
 
 using KernelAbstractions
 
-using FileIO
+using DelimitedFiles
 
 include("rqspline.jl")
 include("utils.jl")
-
 
 end # module
