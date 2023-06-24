@@ -61,14 +61,14 @@ end
 end
 
 @testset "rqs_kernels" begin
-    forward_kernel_test = MonotonicSplines.rqs_forward_kernel!(CPU(), 1)
+    forward_kernel_test = MonotonicSplines.rqs_forward_kernel!(CPU(), 4)
     y_kernel_test = zeros(size(x_test)...)
     ladj_forward_kernel_test = zeros(size(x_test)...)
     forward_kernel_test(x_test, y_kernel_test, ladj_forward_kernel_test, w,h,d, ndrange=size(x_test))
     @test isapprox(y_kernel_test, y_test)
     @test isapprox(sum(ladj_forward_kernel_test, dims = 1), ladj_forward_test)
 
-    backward_kernel_test = MonotonicSplines.rqs_backward_kernel!(CPU(), 1)
+    backward_kernel_test = MonotonicSplines.rqs_backward_kernel!(CPU(), 4)
     x_kernel_test = zeros(size(x_test)...)
     ladj_backward_kernel_test = zeros(size(x_test)...)
     backward_kernel_test(y_test, x_kernel_test, ladj_backward_kernel_test, w,h,d, ndrange=size(x_test))
@@ -89,7 +89,7 @@ end
     t1 = ones(size(x_test)...)
     t2 = ones(size(x_test)...)
 
-    forward_pbk_test = MonotonicSplines.rqs_forward_pullback_kernel!(CPU(),1)
+    forward_pbk_test = MonotonicSplines.rqs_forward_pullback_kernel!(CPU(),4)
     forward_pbk_test(x_test, y, logjac, w, h, d, dydw, dydh, dydd, dljdw, dljdh, dljdd, t1, t2, ndrange=size(x_test))
 
     @test isapprox(y, y_test) 
