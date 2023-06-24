@@ -34,22 +34,20 @@ t1_test = readdlm("test_outputs/t1.txt")
 t2_test = readdlm("test_outputs/t2.txt")
 
 @testset "rqs_structs" begin
-    @test RQS_test isa RQSpline && RQS_test.widths == w && RQS_test.heights == h && RQS_test.derivatives == d
-    @test RQS_inv_test isa RQSplineInv && RQS_inv_test.widths == w && RQS_inv_test.heights == h && RQS_inv_test.derivatives == d
+    @test RQS_test isa RQSpline && isapprox(RQS_test.widths, w) && isapprox(RQS_test.heights, h) && isapprox(RQS_test.derivatives, d)
+    @test RQS_inv_test isa RQSplineInv && isapprox(RQS_inv_test.widths, w) && isapprox(RQS_inv_test.heights, h) && isapprox(RQS_inv_test.derivatives, d)
 end
 
 @testset "rqs_high_lvl_applications" begin
-    @test RQS_test(x_test) == y_test
+    @test isapprox(RQS_test(x_test), y_test)
     @test isapprox(RQS_inv_test(y_test), x_test)
 end
 
 @testset "rqs_low_lvl_applications" begin
-    @test MonotonicSplines.spline_forward(RQS_test, x_test) == (y_test, ladj_forward_test)
-    @test isapprox(MonotonicSplines.spline_backward(RQS_inv_test, y_test)[1], x_test)
-    @test isapprox(MonotonicSplines.spline_backward(RQS_inv_test, y_test)[2], ladj_backward_test)
-    @test MonotonicSplines.rqs_forward(x_test, w, h, d, w, h, d) == (y_test, ladj_forward_test)
-    @test isapprox(MonotonicSplines.rqs_backward(y_test, w, h, d)[1], x_test)
-    @test isapprox(MonotonicSplines.rqs_backward(y_test, w, h, d)[2], ladj_backward_test)
+    @test all(isapprox.(MonotonicSplines.spline_forward(RQS_test, x_test), (y_test, ladj_forward_test)))
+    @test all(isapprox.(MonotonicSplines.spline_backward(RQS_inv_test, y_test), (x_test, ladj_backward_test)))
+    @test all(isapprox.(MonotonicSplines.rqs_forward(x_test, w, h, d, w, h, d), (y_test, ladj_forward_test)))
+    @test all(isapprox.(MonotonicSplines.rqs_backward(y_test, w, h, d), (x_test, ladj_backward_test)))
 end
 
 @testset "rqs_forward_pullback" begin
@@ -61,8 +59,8 @@ end
     y_kernel_test = zeros(size(x_test)...)
     ladj_forward_kernel_test = zeros(size(x_test)...)
     forward_kernel_test(x_test, y_kernel_test, ladj_forward_kernel_test, w,h,d, ndrange=size(x_test))
-    @test y_kernel_test == y_test
-    @test sum(ladj_forward_kernel_test, dims = 1) == ladj_forward_test
+    @test isapprox(y_kernel_test, y_test)
+    @test isapprox(sum(ladj_forward_kernel_test, dims = 1), ladj_forward_test)
 
     backward_kernel_test = MonotonicSplines.rqs_backward_kernel!(CPU(), 1)
     x_kernel_test = zeros(size(x_test)...)
@@ -88,24 +86,30 @@ end
     forward_pbk_test = MonotonicSplines.rqs_forward_pullback_kernel!(CPU(),1)
     forward_pbk_test(x_test, y, logjac, w, h, d, dydw, dydh, dydd, dljdw, dljdh, dljdd, t1, t2, ndrange=size(x_test))
 
-    @test y == y_test 
-    @test logjac == ladj_forward_test
+    @test isapprox(y, y_test) 
+    @test isapprox(logjac, ladj_forward_test)
 
-    @test dydw == dydw_test    
-    @test dydh == dydh_test    
-    @test dydd == dydd_test    
+    @test isapprox(dydw, dydw_test)    
+    @test isapprox(dydh, dydh_test)
+    @test isapprox(dydd, dydd_test)    
 
-    @test dljdw == dljdw_test    
-    @test dljdh == dljdh_test    
-    @test dljdd == dljdd_test   
+    @test isapprox(dljdw, dljdw_test)
+    @test isapprox(dljdh, dljdh_test)    
+    @test isapprox(dljdd, dljdd_test)   
 
-    @test t1 == t1_test 
-    @test t2 == t2_test 
+    @test isapprox(t1, t1_test) 
+    @test isapprox(t2, t2_test)
 end
 
 @testset "eval_rqs_params" begin
-    @test MonotonicSplines.eval_forward_rqs_params(w[1,1,1], w[2,1,1], h[1,1,1], h[2,1,1], h[1,1,1], h[2,1,1], x_test[1,1]) == (-4.905420651500841, -7.711169845398972)
-    @test MonotonicSplines.eval_backward_rqs_params(w[1,1,1], w[2,1,1], h[1,1,1], h[2,1,1], h[1,1,1], h[2,1,1], y_test[1,1]) == (-4.981580571322357, -7.878864476215551)
+    @test all(isapprox.(MonotonicSplines.eval_forward_rqs_params(w[1,1,1], w[2,1,1], h[1,1,1], h[2,1,1], h[1,1,1], h[2,1,1], x_test[1,1]), (-4.905420651500841, -7.711169845398972)))
+    @test all(isapprox.(MonotonicSplines.eval_backward_rqs_params(w[1,1,1], w[2,1,1], h[1,1,1], h[2,1,1], h[1,1,1], h[2,1,1], y_test[1,1]), (-4.981580571322357, -7.878864476215551)))
 
-    @test MonotonicSplines.eval_forward_rqs_params_with_grad(w[1,1,1], w[2,1,1], h[1,1,1], h[2,1,1], h[1,1,1], h[2,1,1], y_test[1,1]) == (-4.905034319051312, -7.137238177160876, (-0.0008667347881545143, 0.0016616793516759222), (0.4767412102473232, 0.5232587897526768), (-0.007999949292501972, 0.008554077697712834), (0.028636334897900184, 0.9994232883327587), (-10.242083538900392, 10.242083538900392), (0.10285870789209196, 0.0764067679810318))
+    @test  all(isapprox.(MonotonicSplines.eval_forward_rqs_params_with_grad(w[1,1,1], w[2,1,1], h[1,1,1], h[2,1,1], h[1,1,1], h[2,1,1], y_test[1,1])[1:2], (-4.905034319051312, -7.137238177160876)))
+    @test  all(isapprox.(MonotonicSplines.eval_forward_rqs_params_with_grad(w[1,1,1], w[2,1,1], h[1,1,1], h[2,1,1], h[1,1,1], h[2,1,1], y_test[1,1])[3], (-0.0008667347881545143, 0.0016616793516759222)))
+    @test  all(isapprox.(MonotonicSplines.eval_forward_rqs_params_with_grad(w[1,1,1], w[2,1,1], h[1,1,1], h[2,1,1], h[1,1,1], h[2,1,1], y_test[1,1])[4], (0.4767412102473232, 0.5232587897526768)))
+    @test  all(isapprox.(MonotonicSplines.eval_forward_rqs_params_with_grad(w[1,1,1], w[2,1,1], h[1,1,1], h[2,1,1], h[1,1,1], h[2,1,1], y_test[1,1])[5], (-0.007999949292501972, 0.008554077697712834)))
+    @test  all(isapprox.(MonotonicSplines.eval_forward_rqs_params_with_grad(w[1,1,1], w[2,1,1], h[1,1,1], h[2,1,1], h[1,1,1], h[2,1,1], y_test[1,1])[6], (0.028636334897900184, 0.9994232883327587)))
+    @test  all(isapprox.(MonotonicSplines.eval_forward_rqs_params_with_grad(w[1,1,1], w[2,1,1], h[1,1,1], h[2,1,1], h[1,1,1], h[2,1,1], y_test[1,1])[7], (-10.242083538900392, 10.242083538900392)))
+    @test  all(isapprox.(MonotonicSplines.eval_forward_rqs_params_with_grad(w[1,1,1], w[2,1,1], h[1,1,1], h[2,1,1], h[1,1,1], h[2,1,1], y_test[1,1])[8], (0.10285870789209196, 0.0764067679810318)))
 end

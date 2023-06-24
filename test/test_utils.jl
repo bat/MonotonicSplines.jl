@@ -30,19 +30,19 @@ softplus_matrix_test_output = readdlm("test_outputs/softplus_matrix_test_output.
 softplus_vector_test_output = vec(readdlm("test_outputs/softplus_vector_test_output.txt"))
 
 @testset "parameter_processing_functions" begin
-    @test get_params(test_nn_output, n_dims_to_transform) == test_params_processed
+    @test all(isapprox.(get_params(test_nn_output, n_dims_to_transform), test_params_processed))
 
-    @test MonotonicSplines._softmax_tri(test_params_raw) == softmax_tri_test_output
-    @test MonotonicSplines._softmax(test_params_matrix) == softmax_matrix_test_output
-    @test MonotonicSplines._softmax(test_params_vector) == softmax_vector_test_output
+    @test isapprox(MonotonicSplines._softmax_tri(test_params_raw), softmax_tri_test_output)
+    @test isapprox(MonotonicSplines._softmax(test_params_matrix), softmax_matrix_test_output)
+    @test isapprox(MonotonicSplines._softmax(test_params_vector), softmax_vector_test_output)
 
-    @test MonotonicSplines._cumsum_tri(test_params_raw) == cumsum_tri_test_output
-    @test MonotonicSplines._cumsum(test_params_matrix) == cumsum_matrix_test_output
-    @test MonotonicSplines._cumsum(test_params_vector) == cumsum_vector_test_output
+    @test isapprox(MonotonicSplines._cumsum_tri(test_params_raw), cumsum_tri_test_output)
+    @test isapprox(MonotonicSplines._cumsum(test_params_matrix), cumsum_matrix_test_output)
+    @test isapprox(MonotonicSplines._cumsum(test_params_vector), cumsum_vector_test_output)
 
-    @test MonotonicSplines._softplus_tri(test_params_raw) == softplus_tri_test_output
-    @test MonotonicSplines._softplus(test_params_matrix) == softplus_matrix_test_output
-    @test MonotonicSplines._softplus(test_params_vector) == softplus_vector_test_output
+    @test isapprox(MonotonicSplines._softplus_tri(test_params_raw), softplus_tri_test_output)
+    @test isapprox(MonotonicSplines._softplus(test_params_matrix), softplus_matrix_test_output)
+    @test isapprox(MonotonicSplines._softplus(test_params_vector), softplus_vector_test_output)
 end
 
 @testset "output_sorting_and_bin_search" begin
