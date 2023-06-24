@@ -1,6 +1,7 @@
 # This file is a part of MonotonicSplines.jl, licensed under the MIT License (MIT).
 
 using ChainRulesCore
+using ChangesOfVariables
 using DelimitedFiles
 using KernelAbstractions
 using MonotonicSplines
@@ -41,6 +42,11 @@ end
 @testset "rqs_high_lvl_applications" begin
     @test isapprox(RQS_test(x_test), y_test)
     @test isapprox(RQS_inv_test(y_test), x_test)
+end
+
+@testset "with_logabsdet_jacobian" begin
+    @test all(isapprox.(ChangesOfVariables.with_logabsdet_jacobian(RQS_test,x_test), (y_test, ladj_forward_test)))
+    @test all(isapprox.(ChangesOfVariables.with_logabsdet_jacobian(RQS_inv_test,y_test), (x_test, ladj_backward_test)))
 end
 
 @testset "rqs_low_lvl_applications" begin
