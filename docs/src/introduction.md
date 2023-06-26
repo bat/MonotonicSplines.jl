@@ -60,11 +60,6 @@ The outermost knots are set to be at the interval edges ``(x_1,y_1)\equiv(-B,-B)
 
 With this construction, ``3(K - 1)`` parameters are needed to fully characterize a spline function ``f`` : ``K + 1`` sets of ``x_k`` and ``y_k`` coordinates for the knots, plus ``K + 1`` derivatives ``\delta_k`` minus the two fixed sets of coordinates and derivatives for the boundary knots.
 
-# Implementation
----
-
-``TODO``
-
 [^1]: Conor Durkan, Artur Bekasov, Iain Murray, George Papamakarios *Neural Spline Flows*. [arXiv:1906.04032](https://arxiv.org/abs/1906.04032)
 
 [^2]: Ivan Kobyzev, Simon J.D. Prince, Marcus A. Brubaker. *
