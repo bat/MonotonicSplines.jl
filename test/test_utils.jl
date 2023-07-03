@@ -8,26 +8,26 @@ K = 10
 n_dims_to_transform = 1
 n_smpls = 10
 
-test_nn_output = readdlm("test_outputs/test_nn_output.txt")
+test_nn_output = readdlm("test/test_outputs/test_nn_output.txt")
 
-test_params_processed_unshaped = readdlm("test_outputs/test_params_processed.txt")
+test_params_processed_unshaped = readdlm("test/test_outputs/test_params_processed.txt")
 test_params_processed = Tuple([reshape(test_params_processed_unshaped[i,:], 11,1,10) for i in 1:3])
 
 test_params_raw = reshape(test_nn_output, :, n_dims_to_transform, n_smpls)[1:K,:,:]
-test_params_matrix = readdlm("test_outputs/test_params_matrix.txt")
-test_params_vector = vec(readdlm("test_outputs/test_params_vector.txt"))
+test_params_matrix = readdlm("test/test_outputs/test_params_matrix.txt")
+test_params_vector = vec(readdlm("test/test_outputs/test_params_vector.txt"))
 
-softmax_tri_test_output = reshape(readdlm("test_outputs/softmax_tri_test_output.txt"), 10,1,10)
-softmax_matrix_test_output = readdlm("test_outputs/softmax_matrix_test_output.txt")
-softmax_vector_test_output = vec(readdlm("test_outputs/softmax_vector_test_output.txt"))
+softmax_tri_test_output = reshape(readdlm("test/test_outputs/softmax_tri_test_output.txt"), 10,1,10)
+softmax_matrix_test_output = readdlm("test/test_outputs/softmax_matrix_test_output.txt")
+softmax_vector_test_output = vec(readdlm("test/test_outputs/softmax_vector_test_output.txt"))
 
-cumsum_tri_test_output = reshape(readdlm("test_outputs/cumsum_tri_test_output.txt"), 10,1,10)
-cumsum_matrix_test_output = readdlm("test_outputs/cumsum_matrix_test_output.txt")
-cumsum_vector_test_output = vec(readdlm("test_outputs/cumsum_vector_test_output.txt"))
+cumsum_tri_test_output = reshape(readdlm("test/test_outputs/cumsum_tri_test_output.txt"), 10,1,10)
+cumsum_matrix_test_output = readdlm("test/test_outputs/cumsum_matrix_test_output.txt")
+cumsum_vector_test_output = vec(readdlm("test/test_outputs/cumsum_vector_test_output.txt"))
 
-softplus_tri_test_output = reshape(readdlm("test_outputs/softplus_tri_test_output.txt"), 10,1,10)
-softplus_matrix_test_output = readdlm("test_outputs/softplus_matrix_test_output.txt")
-softplus_vector_test_output = vec(readdlm("test_outputs/softplus_vector_test_output.txt"))
+softplus_tri_test_output = reshape(readdlm("test/test_outputs/softplus_tri_test_output.txt"), 10,1,10)
+softplus_matrix_test_output = readdlm("test/test_outputs/softplus_matrix_test_output.txt")
+softplus_vector_test_output = vec(readdlm("test/test_outputs/softplus_vector_test_output.txt"))
 
 @testset "parameter_processing_functions" begin
     @test all(isapprox.(get_params(test_nn_output, n_dims_to_transform), test_params_processed))
