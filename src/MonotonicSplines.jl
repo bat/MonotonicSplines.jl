@@ -20,8 +20,6 @@ using Functors: @functor
 
 using KernelAbstractions
 
-using DelimitedFiles
-
 include("rqspline.jl")
 include("utils.jl")
 

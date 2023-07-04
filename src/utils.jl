@@ -1,4 +1,5 @@
 # This file is a part of EuclidianNormalizingFlows.jl, licensed under the MIT License (MIT)
+
 """
     get_params(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
 
