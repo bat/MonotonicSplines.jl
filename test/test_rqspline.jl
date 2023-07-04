@@ -7,32 +7,32 @@ using KernelAbstractions
 using MonotonicSplines
 using Test
 
-test_params_processed_unshaped = readdlm("test/test_outputs/test_params_processed.txt")
+test_params_processed_unshaped = readdlm("test_outputs/test_params_processed.txt")
 test_params_processed = Tuple([reshape(test_params_processed_unshaped[i,:], 11,1,10) for i in 1:3])
 
 w = test_params_processed[1]
 h = test_params_processed[2]
 d = test_params_processed[3]
 
-x_test = readdlm("test/test_outputs/x_test.txt")
-y_test = readdlm("test/test_outputs/y_test.txt")
+x_test = readdlm("test_outputs/x_test.txt")
+y_test = readdlm("test_outputs/y_test.txt")
 
-ladj_forward_test = readdlm("test/test_outputs/ladj_forward_test.txt")
-ladj_backward_test = readdlm("test/test_outputs/ladj_backward_test.txt")
+ladj_forward_test = readdlm("test_outputs/ladj_forward_test.txt")
+ladj_backward_test = readdlm("test_outputs/ladj_backward_test.txt")
 
 RQS_test = RQSpline(test_params_processed...)
 RQS_inv_test = RQSplineInv(test_params_processed...)
 
-dydw_test = reshape(readdlm("test/test_outputs/dydw.txt"), 11,1,10)
-dydh_test = reshape(readdlm("test/test_outputs/dydh.txt"), 11,1,10)
-dydd_test = reshape(readdlm("test/test_outputs/dydd.txt"), 11,1,10)
+dydw_test = reshape(readdlm("test_outputs/dydw.txt"), 11,1,10)
+dydh_test = reshape(readdlm("test_outputs/dydh.txt"), 11,1,10)
+dydd_test = reshape(readdlm("test_outputs/dydd.txt"), 11,1,10)
 
-dljdw_test = reshape(readdlm("test/test_outputs/dljdw.txt"), 11,1,10)
-dljdh_test = reshape(readdlm("test/test_outputs/dljdh.txt"), 11,1,10)
-dljdd_test = reshape(readdlm("test/test_outputs/dljdd.txt"), 11,1,10)
+dljdw_test = reshape(readdlm("test_outputs/dljdw.txt"), 11,1,10)
+dljdh_test = reshape(readdlm("test_outputs/dljdh.txt"), 11,1,10)
+dljdd_test = reshape(readdlm("test_outputs/dljdd.txt"), 11,1,10)
 
-t1_test = readdlm("test/test_outputs/t1.txt")
-t2_test = readdlm("test/test_outputs/t2.txt")
+t1_test = readdlm("test_outputs/t1.txt")
+t2_test = readdlm("test_outputs/t2.txt")
 
 @testset "rqs_structs" begin
     @test RQS_test isa RQSpline && isapprox(RQS_test.widths, w) && isapprox(RQS_test.heights, h) && isapprox(RQS_test.derivatives, d)
