@@ -91,12 +91,12 @@ function rqs_forward(
     T = promote_type(M0, M1, M2, M3, M4, M5, M6)
     ndims, nsmpls = size(x)
 
-    device = KernelAbstractions.get_backend(x)
-    n = device isa GPU ? 256 : Threads.nthreads()
-    kernel! = rqs_forward_kernel!(device, n)
+    compute_unit = get_compute_unit(x)
+    n = compute_unit isa AbstractGPUnit ? 256 : Threads.nthreads()
+    kernel! = rqs_forward_kernel!(compute_unit, n)
 
-    y = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
-    logJac = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
+    y = adapt(compute_unit,  zeros(T, ndims, nsmpls))
+    logJac = adapt(compute_unit,  zeros(T, ndims, nsmpls))
 
     kernel!(x, y, logJac, w, h, d, ndrange=size(x))
 
@@ -129,21 +129,21 @@ function rqs_forward_pullback(
     nsmpls = size(x, 2)
     nparams = size(w, 1)
 
-    device = KernelAbstractions.get_backend(x)
-    n = device isa GPU ? 256 : Threads.nthreads()
+    compute_unit = get_compute_unit(x)
+    n = compute_unit isa AbstractGPUnit ? 256 : Threads.nthreads()
 
-    y = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
-    logJac = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
+    y = adapt(compute_unit, zeros(T, ndims, nsmpls))
+    logJac = adapt(compute_unit,  zeros(T, ndims, nsmpls))
 
-    ∂y∂w = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
-    ∂y∂h = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
-    ∂y∂d = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
+    ∂y∂w = adapt(compute_unit,  zeros(T, nparams, ndims, nsmpls))
+    ∂y∂h = adapt(compute_unit,  zeros(T, nparams, ndims, nsmpls))
+    ∂y∂d = adapt(compute_unit,  zeros(T, nparams, ndims, nsmpls))
 
-    ∂LogJac∂w = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
-    ∂LogJac∂h = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
-    ∂LogJac∂d = device isa GPU ? gpu(zeros(T, nparams, ndims, nsmpls)) : zeros(T, nparams, ndims, nsmpls)
+    ∂LogJac∂w = adapt(compute_unit,  zeros(T, nparams, ndims, nsmpls))
+    ∂LogJac∂h = adapt(compute_unit,  zeros(T, nparams, ndims, nsmpls))
+    ∂LogJac∂d = adapt(compute_unit,  zeros(T, nparams, ndims, nsmpls))
 
-    kernel! = rqs_forward_pullback_kernel!(device, n)
+    kernel! = rqs_forward_pullback_kernel!(compute_unit, n)
 
     kernel!(
         x, y, logJac, 
@@ -281,8 +281,10 @@ function ChainRulesCore.rrule(
 ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
 
     y, logJac = rqs_forward(x, w, h, d, w_logJac, h_logJac, d_logJac)
-    device = KernelAbstractions.get_backend(x)
-    pullback(tangent) = device isa GPU ? rqs_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, gpu(tangent[1]), gpu(tangent[2])) : rqs_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, tangent[1], tangent[2])
+    compute_unit = get_compute_unit(x)
+
+    pullback(tangent) = rqs_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))
+
     return (y, logJac), pullback
 end
 
@@ -423,15 +425,13 @@ function rqs_backward(
     T = promote_type(M0, M1, M2, M3)
     ndims, nsmpls = size(x)
 
-    device = KernelAbstractions.get_backend(x)
-    n = device isa GPU ? 256 : Threads.nthreads()
-    kernel! = rqs_backward_kernel!(device, n)
+    compute_unit = get_compute_unit(x)
+    n = compute_unit isa AbstractGPUnit ? 256 : Threads.nthreads()
+    kernel! = rqs_backward_kernel!(compute_unit, n)
 
-    y = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
-    logJac = device isa GPU ? gpu(zeros(T, ndims, nsmpls)) : zeros(T, ndims, nsmpls)
-
+    y = adapt(compute_unit, zeros(T, ndims, nsmpls))
+    logJac = adapt(compute_unit, zeros(T, ndims, nsmpls)) 
     kernel!(x, y, logJac, w, h, d, ndrange=size(x))
-
     logJac = sum(logJac, dims=1)
 
     return y, logJac

@@ -15,11 +15,11 @@ function get_params(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
     K = Int((size(θ_raw,1)/n_dims_trafo+1)/3)
     θ = reshape(θ_raw, :, n_dims_trafo, N)
 
-    device = KernelAbstractions.get_backend(θ_raw)
+    compute_unit = get_compute_unit(θ_raw)
 
-    w = device isa GPU ? cat(cu(repeat([-B], 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[1:K,:,:])); dims = 1) : cat(repeat([-B], 1, n_dims_trafo, N), _cumsum_tri(_softmax_tri(θ[1:K,:,:])), dims = 1)
-    h = device isa GPU ? cat(cu(repeat([-B], 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[K+1:2K,:,:])); dims = 1) : cat(repeat([-B], 1, n_dims_trafo, N), _cumsum_tri(_softmax_tri(θ[K+1:2K,:,:])), dims = 1)
-    d = device isa GPU ? cat(cu(repeat([1], 1, n_dims_trafo, N)), _softplus_tri(θ[2K+1:end,:,:]), cu(repeat([1], 1, n_dims_trafo, N)); dims = 1) : cat(repeat([1], 1, n_dims_trafo, N), _softplus_tri(θ[2K+1:end,:,:]), repeat([1], 1, n_dims_trafo, N), dims = 1)
+    w =  cat(adapt(compute_unit, repeat([-B], 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[1:K,:,:])); dims = 1)
+    h =  cat(adapt(compute_unit, repeat([-B], 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[K+1:2K,:,:])); dims = 1)
+    d =  cat(adapt(compute_unit, repeat([1], 1, n_dims_trafo, N)), _softplus_tri(θ[2K+1:end,:,:]), adapt(compute_unit, repeat([1], 1, n_dims_trafo, N)); dims = 1)
 
     return w, h, d
 end
@@ -103,6 +103,16 @@ end
 
 function _softplus_tri(x::AbstractArray)
     return log.(exp.(x) .+ 1) 
+end
+
+KernelAbstractions.isgpu(::AbstractGPUnit) = true
+KernelAbstractions.isgpu(::CPUnit) = false
+
+function KernelAbstractions.construct(backend::Backend, ::S, ::NDRange, xpu_name::XPUName) where {Backend<:AbstractComputeUnit, S<:KernelAbstractions._Size, NDRange<:KernelAbstractions._Size, XPUName}
+    
+    compute_unit = Backend<:AbstractGPUnit ? KernelAbstractions.GPU : KernelAbstractions.CPU
+
+    return KernelAbstractions.Kernel{compute_unit, S, NDRange, XPUName}(backend, xpu_name)
 end
 
 midpoint(lo::T, hi::T) where T<:Integer = lo + ((hi - lo) >>> 0x01)
