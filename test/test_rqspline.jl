@@ -1,5 +1,6 @@
 # This file is a part of MonotonicSplines.jl, licensed under the MIT License (MIT).
 
+using Adapt
 using ChainRulesCore
 using ChangesOfVariables
 using DelimitedFiles
