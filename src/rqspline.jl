@@ -68,7 +68,7 @@ function spline_forward(trafo::RQSpline, x::AbstractMatrix{<:Real})
 end
 
 """
-    rqs_forward(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, w_logJac::AbstractArray{<:Real}, h_logJac::AbstractArray{<:Real}, d_logJac::AbstractArray{<:Real})
+    rqs_forward(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real})
 
 Apply the rational quadratic spline functions characterized by `w`, `h`, and `d` to `x`. 
 The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
@@ -100,7 +100,7 @@ function rqs_forward(
 end
 
 """
-    rqs_forward_pullback(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, w_logJac::AbstractArray{<:Real}, h_logJac::AbstractArray{<:Real}, d_logJac::AbstractArray{<:Real}, tangent_1::AbstractArray, tangent_2::AbstractArray)
+    rqs_forward_pullback(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, tangent_1::AbstractArray, tangent_2::AbstractArray)
 
 Return the gradients of the spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x`.
 The output will be on the same backend as `x` and `w`, `h`, and `d` (CPU or GPU).
@@ -377,7 +377,7 @@ end
 # Transformation backward: 
 
 """
-    rqs_backward(trafo::InvRQSpline, x::AbstractMatrix{<:Real})
+    spline_backward(trafo::InvRQSpline, x::AbstractMatrix{<:Real})
 
 Apply the inverse rational quadratic spline functions characterized by the parameters stored in `trafo` to the matrix `x`.
 The rational quadratic spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
@@ -442,7 +442,7 @@ end
     (yᵢⱼ, LogJacᵢⱼ) = eval_backward_rqs_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
-    logJac[i, j] += Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
+    logJac[i, j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
 end
 
 function eval_backward_rqs_params(
