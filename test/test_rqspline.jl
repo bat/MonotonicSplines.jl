@@ -13,38 +13,40 @@ compute_units = isdefined(Main, :CUDA) ? [AbstractComputeUnit(CUDA.device()), CP
 
 for compute_unit in compute_units
 
-    compute_unit_type = compute_unit isa AbstractGPUnit ? "GPU" : "CPU"
+    local compute_unit_type = compute_unit isa AbstractGPUnit ? "GPU" : "CPU"
 
-    test_params_processed_unshaped = adapt(compute_unit, readdlm("test_outputs/test_params_processed.txt"))
-    test_params_processed = adapt(compute_unit, Tuple([reshape(test_params_processed_unshaped[i,:], 11,1,10) for i in 1:3]))
+    local test_params_processed_unshaped = adapt(compute_unit, readdlm("test_outputs/test_params_processed.txt"))
+    local test_params_processed = adapt(compute_unit, Tuple([reshape(test_params_processed_unshaped[i,:], 11,1,10) for i in 1:3]))
 
-    w = test_params_processed[1]
-    h = test_params_processed[2]
-    d = test_params_processed[3]
+    local w = test_params_processed[1]
+    local h = test_params_processed[2]
+    local d = test_params_processed[3]
 
-    x_test = adapt(compute_unit, readdlm("test_outputs/x_test.txt"))
-    y_test = adapt(compute_unit, readdlm("test_outputs/y_test.txt"))
+    local x_test = adapt(compute_unit, readdlm("test_outputs/x_test.txt"))
+    local y_test = adapt(compute_unit, readdlm("test_outputs/y_test.txt"))
 
-    ladj_forward_test = adapt(compute_unit, readdlm("test_outputs/ladj_forward_test.txt"))
-    ladj_backward_test = adapt(compute_unit, readdlm("test_outputs/ladj_backward_test.txt"))
+    local ladj_forward_test = adapt(compute_unit, readdlm("test_outputs/ladj_forward_test.txt"))
+    local ladj_backward_test = adapt(compute_unit, readdlm("test_outputs/ladj_backward_test.txt"))
 
-    RQS_test = RQSpline(test_params_processed...)
-    RQS_inv_test = RQSplineInv(test_params_processed...)
+    local RQS_test = RQSpline(test_params_processed...)
+    local RQS_inv_test = InvRQSpline(test_params_processed...)
 
-    dydw_test = adapt(compute_unit, reshape(readdlm("test_outputs/dydw.txt"), 11,1,10))
-    dydh_test = adapt(compute_unit, reshape(readdlm("test_outputs/dydh.txt"), 11,1,10))
-    dydd_test = adapt(compute_unit, reshape(readdlm("test_outputs/dydd.txt"), 11,1,10))
+    local rqs_forward_pullback_test = Tuple([reshape(readdlm("test_outputs/rqs_forward_pullback_test.txt")[i,:], 11, 1, 10) for i in 1:6])
 
-    dljdw_test = adapt(compute_unit, reshape(readdlm("test_outputs/dljdw.txt"), 11,1,10))
-    dljdh_test = adapt(compute_unit, reshape(readdlm("test_outputs/dljdh.txt"), 11,1,10))
-    dljdd_test = adapt(compute_unit, reshape(readdlm("test_outputs/dljdd.txt"), 11,1,10))
+    local dydw_test = adapt(compute_unit, reshape(readdlm("test_outputs/dydw.txt"), 11,1,10))
+    local dydh_test = adapt(compute_unit, reshape(readdlm("test_outputs/dydh.txt"), 11,1,10))
+    local dydd_test = adapt(compute_unit, reshape(readdlm("test_outputs/dydd.txt"), 11,1,10))
 
-    t1_test = adapt(compute_unit, readdlm("test_outputs/t1.txt"))
-    t2_test = adapt(compute_unit, readdlm("test_outputs/t2.txt"))
+    local dljdw_test = adapt(compute_unit, reshape(readdlm("test_outputs/dljdw.txt"), 11,1,10))
+    local dljdh_test = adapt(compute_unit, reshape(readdlm("test_outputs/dljdh.txt"), 11,1,10))
+    local dljdd_test = adapt(compute_unit, reshape(readdlm("test_outputs/dljdd.txt"), 11,1,10))
+
+    local t1_test = adapt(compute_unit, readdlm("test_outputs/t1.txt"))
+    local t2_test = adapt(compute_unit, readdlm("test_outputs/t2.txt"))
 
     @testset "rqs_structs_$compute_unit_type" begin
         @test RQS_test isa RQSpline && isapprox(RQS_test.widths, w) && isapprox(RQS_test.heights, h) && isapprox(RQS_test.derivatives, d)
-        @test RQS_inv_test isa RQSplineInv && isapprox(RQS_inv_test.widths, w) && isapprox(RQS_inv_test.heights, h) && isapprox(RQS_inv_test.derivatives, d)
+        @test RQS_inv_test isa InvRQSpline && isapprox(RQS_inv_test.widths, w) && isapprox(RQS_inv_test.heights, h) && isapprox(RQS_inv_test.derivatives, d)
     end
 
     @testset "rqs_high_lvl_applications_$compute_unit_type" begin
@@ -60,12 +62,12 @@ for compute_unit in compute_units
     @testset "rqs_low_lvl_applications_$compute_unit_type" begin
         @test all(isapprox.(MonotonicSplines.spline_forward(RQS_test, x_test), (y_test, ladj_forward_test)))
         @test all(isapprox.(MonotonicSplines.spline_backward(RQS_inv_test, y_test), (x_test, ladj_backward_test)))
-        @test all(isapprox.(MonotonicSplines.rqs_forward(x_test, w, h, d, w, h, d), (y_test, ladj_forward_test)))
+        @test all(isapprox.(MonotonicSplines.rqs_forward(x_test, w, h, d), (y_test, ladj_forward_test)))
         @test all(isapprox.(MonotonicSplines.rqs_backward(y_test, w, h, d), (x_test, ladj_backward_test)))
     end
 
     @testset "rqs_forward_pullback_$compute_unit_type" begin
-        @test MonotonicSplines.rqs_forward_pullback(x_test, w,h,d, w,h,d, zeros(size(x_test)...), zeros(1,size(x_test,2))) isa Tuple{ChainRulesCore.NoTangent, ChainRulesCore.Thunk{MonotonicSplines.var"#5#6"{Matrix{Float64}}}, Array{Float64, 3}, Array{Float64, 3}, Array{Float64, 3}, Array{Float64, 3}, Array{Float64, 3}, Array{Float64, 3}}
+        @test all(isapprox.(MonotonicSplines.rqs_forward_pullback(x_test, w,h,d, ones(size(x_test)...), ones(1,size(x_test,2))), rqs_forward_pullback_test))
     end
 
     @testset "rqs_kernels_$compute_unit_type" begin

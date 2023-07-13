@@ -27,7 +27,7 @@ end
 export get_params
 
 """
-    _sort_dimensions(y₁::AbstractArray, y₂::AbstractArray, mask::AbstractVector)
+    sort_dimensions(y₁::AbstractArray, y₂::AbstractArray, mask::AbstractVector)
 
 Output an array identical to `y₂`, but with the rows specified by `mask` overwritten with the corresponding rows in `y₁`.
 """

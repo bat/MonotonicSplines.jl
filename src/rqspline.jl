@@ -31,26 +31,26 @@ function ChangesOfVariables.with_logabsdet_jacobian(
 end
 
 """
-    RQSplineInv(widths::AbstractArray{<:Real}, heights::AbstractArray{<:Real}, derivatives::AbstractArray{<:Real})
+    InvRQSpline(widths::AbstractArray{<:Real}, heights::AbstractArray{<:Real}, derivatives::AbstractArray{<:Real})
 
-Object holding the parameters to characterize several inverse rational quadratic spline functions analogous to `RQSplineInv`.
+Object holding the parameters to characterize several inverse rational quadratic spline functions analogous to `InvRQSpline`.
 
 The same parameters are used to characterize the forward and inverse spline functions, the struct used to store them decides 
 the equation they are evaluated in. 
 """
-struct RQSplineInv <: Function
+struct InvRQSpline <: Function
     widths::AbstractArray{<:Real}
     heights::AbstractArray{<:Real}
     derivatives::AbstractArray{<:Real}
 end
 
-@functor RQSplineInv
-export RQSplineInv
+@functor InvRQSpline
+export InvRQSpline
 
-(f::RQSplineInv)(x::AbstractMatrix{<:Real}) = spline_backward(f, x)[1]
+(f::InvRQSpline)(x::AbstractMatrix{<:Real}) = spline_backward(f, x)[1]
 
 function ChangesOfVariables.with_logabsdet_jacobian(
-    f::RQSplineInv,
+    f::InvRQSpline,
     x::AbstractMatrix{<:Real}
 )
     return spline_backward(f, x)
@@ -64,7 +64,7 @@ Apply the rational quadratic spline functions characterized by the parameters st
 The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
 """
 function spline_forward(trafo::RQSpline, x::AbstractMatrix{<:Real})
-    return rqs_forward(x, trafo.widths, trafo.heights, trafo.derivatives, trafo.widths, trafo.heights, trafo.derivatives)
+    return rqs_forward(x, trafo.widths, trafo.heights, trafo.derivatives)
 end
 
 """
@@ -79,24 +79,18 @@ of the logarithm of the absolute values of the determinant of the jacobians of t
 The function executes in a kernel, on the same backend as `x` is stored (CPU or GPU), the output will also be returned on the same backend.
 """
 function rqs_forward(
-        x::AbstractArray{M0},
-        w::AbstractArray{M1},
-        h::AbstractArray{M2},
-        d::AbstractArray{M3},
-        w_logJac::AbstractArray{M4},
-        h_logJac::AbstractArray{M5},
-        d_logJac::AbstractArray{M6} 
-    ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
-
-    T = promote_type(M0, M1, M2, M3, M4, M5, M6)
-    ndims, nsmpls = size(x)
+        x::AbstractArray{<:Real},
+        w::AbstractArray{<:Real},
+        h::AbstractArray{<:Real},
+        d::AbstractArray{<:Real}
+    ) 
 
     compute_unit = get_compute_unit(x)
     n = compute_unit isa AbstractGPUnit ? 256 : Threads.nthreads()
     kernel! = rqs_forward_kernel!(compute_unit, n)
 
-    y = adapt(compute_unit,  zeros(T, ndims, nsmpls))
-    logJac = adapt(compute_unit,  zeros(T, ndims, nsmpls))
+    y = similar(x)
+    logJac = similar(x)
 
     kernel!(x, y, logJac, w, h, d, ndrange=size(x))
 
@@ -112,36 +106,27 @@ Return the gradients of the spline functions characterized by `w`, `h`, and `d`,
 The output will be on the same backend as `x` and `w`, `h`, and `d` (CPU or GPU).
 """
 function rqs_forward_pullback(
-        x::AbstractArray{M0},
-        w::AbstractArray{M1},
-        h::AbstractArray{M2},
-        d::AbstractArray{M3},
-        w_logJac::AbstractArray{M4},
-        h_logJac::AbstractArray{M5},
-        d_logJac::AbstractArray{M6},
-        tangent_1::AbstractArray,
-        tangent_2::AbstractArray;
-    ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
-
-    T = promote_type(M0, M1, M2, M3, M4, M5, M6)
-
-    ndims = size(x, 1)
-    nsmpls = size(x, 2)
-    nparams = size(w, 1)
+        x::AbstractArray{<:Real},
+        w::AbstractArray{<:Real},
+        h::AbstractArray{<:Real},
+        d::AbstractArray{<:Real},
+        tangent_1::AbstractArray{<:Real},
+        tangent_2::AbstractArray{<:Real};
+    ) 
 
     compute_unit = get_compute_unit(x)
     n = compute_unit isa AbstractGPUnit ? 256 : Threads.nthreads()
 
-    y = adapt(compute_unit, zeros(T, ndims, nsmpls))
-    logJac = adapt(compute_unit,  zeros(T, ndims, nsmpls))
+    y = similar(x)
+    logJac = similar(x)
 
-    ∂y∂w = adapt(compute_unit,  zeros(T, nparams, ndims, nsmpls))
-    ∂y∂h = adapt(compute_unit,  zeros(T, nparams, ndims, nsmpls))
-    ∂y∂d = adapt(compute_unit,  zeros(T, nparams, ndims, nsmpls))
+    ∂y∂w = fill!(similar(w), zero(eltype(w)))
+    ∂y∂d = fill!(similar(h), zero(eltype(h)))
+    ∂y∂h = fill!(similar(d), zero(eltype(d)))
 
-    ∂LogJac∂w = adapt(compute_unit,  zeros(T, nparams, ndims, nsmpls))
-    ∂LogJac∂h = adapt(compute_unit,  zeros(T, nparams, ndims, nsmpls))
-    ∂LogJac∂d = adapt(compute_unit,  zeros(T, nparams, ndims, nsmpls))
+    ∂LogJac∂w = fill!(similar(w), zero(eltype(w)))
+    ∂LogJac∂h = fill!(similar(h), zero(eltype(h)))
+    ∂LogJac∂d = fill!(similar(d), zero(eltype(d)))
 
     kernel! = rqs_forward_pullback_kernel!(compute_unit, n)
 
@@ -157,7 +142,7 @@ function rqs_forward_pullback(
 
     logJac = sum(logJac, dims=1)
 
-    return NoTangent(), @thunk(tangent_1 .* exp.(logJac)), ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d
+    return ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d
 end
 
 """ 
@@ -172,13 +157,14 @@ of the jacobians of the spline functions applied to a column of `x` are stored i
 To find the bin `k` in which the respective x value for a spline falls in, a the corresponding column of `w` is searched.j
 """
 @kernel function rqs_forward_kernel!(
-    x::AbstractArray,
-    y::AbstractArray,
-    logJac::AbstractArray,
-    w::AbstractArray,
-    h::AbstractArray,
-    d::AbstractArray
+    x::AbstractArray{<:Real},
+    y::AbstractArray{<:Real},
+    logJac::AbstractArray{<:Real},
+    w::AbstractArray{<:Real},
+    h::AbstractArray{<:Real},
+    d::AbstractArray{<:Real}
 )
+
     i, j = @index(Global, NTuple)
 
     K = size(w, 1) - 1
@@ -219,20 +205,20 @@ Return the gradients of the rational quadratic spline functions characterized by
 The output will be on the same backend as `x` and `w`, `h`, and `d` (CPU or GPU).
 """
 @kernel function rqs_forward_pullback_kernel!(
-        x::AbstractArray,
-        y::AbstractArray,
-        logJac::AbstractArray,
-        w::AbstractArray,
-        h::AbstractArray,
-        d::AbstractArray,
-        ∂y∂w_tangent::AbstractArray,
-        ∂y∂h_tangent::AbstractArray,
-        ∂y∂d_tangent::AbstractArray,
-        ∂LogJac∂w_tangent::AbstractArray,
-        ∂LogJac∂h_tangent::AbstractArray,
-        ∂LogJac∂d_tangent::AbstractArray,
-        tangent_1::AbstractArray,
-        tangent_2::AbstractArray,
+        x::AbstractArray{<:Real},
+        y::AbstractArray{<:Real},
+        logJac::AbstractArray{<:Real},
+        w::AbstractArray{<:Real},
+        h::AbstractArray{<:Real},
+        d::AbstractArray{<:Real},
+        ∂y∂w_tangent::AbstractArray{<:Real},
+        ∂y∂h_tangent::AbstractArray{<:Real},
+        ∂y∂d_tangent::AbstractArray{<:Real},
+        ∂LogJac∂w_tangent::AbstractArray{<:Real},
+        ∂LogJac∂h_tangent::AbstractArray{<:Real},
+        ∂LogJac∂d_tangent::AbstractArray{<:Real},
+        tangent_1::AbstractArray{<:Real},
+        tangent_2::AbstractArray{<:Real},
     )
 
     i, j = @index(Global, NTuple)
@@ -271,19 +257,16 @@ end
 
 function ChainRulesCore.rrule(
     ::typeof(rqs_forward),
-    x::AbstractArray{M0},
-    w::AbstractArray{M1},
-    h::AbstractArray{M2},
-    d::AbstractArray{M3},
-    w_logJac::AbstractArray{M4},
-    h_logJac::AbstractArray{M5},
-    d_logJac::AbstractArray{M6};
-) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
+    x::AbstractArray{<:Real},
+    w::AbstractArray{<:Real},
+    h::AbstractArray{<:Real},
+    d::AbstractArray{<:Real}
+)
 
-    y, logJac = rqs_forward(x, w, h, d, w_logJac, h_logJac, d_logJac)
+    y, logJac = rqs_forward(x, w, h, d)
     compute_unit = get_compute_unit(x)
 
-    pullback(tangent) = rqs_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))
+    pullback(tangent) =(NoTangent(), @thunk(tangent_1 .* exp.(logJac)), rqs_forward_pullback(x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...)
 
     return (y, logJac), pullback
 end
@@ -394,12 +377,12 @@ end
 # Transformation backward: 
 
 """
-    rqs_backward(trafo::RQSplineInv, x::AbstractMatrix{<:Real})
+    rqs_backward(trafo::InvRQSpline, x::AbstractMatrix{<:Real})
 
 Apply the inverse rational quadratic spline functions characterized by the parameters stored in `trafo` to the matrix `x`.
 The rational quadratic spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
 """
-function spline_backward(trafo::RQSplineInv, x::AbstractMatrix{<:Real})
+function spline_backward(trafo::InvRQSpline, x::AbstractMatrix{<:Real})
     return rqs_backward(x, trafo.widths, trafo.heights, trafo.derivatives)
 
 end
@@ -416,21 +399,18 @@ of the logarithm of the absolute values of the determinant of the jacobians of t
 The function executes in a kernel, on the same backend as `x` is stored (CPU or GPU), the output will also be returned on the same backend.
 """
 function rqs_backward(
-        x::AbstractArray{M0},
-        w::AbstractArray{M1},
-        h::AbstractArray{M2},
-        d::AbstractArray{M3}
-    ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
-    
-    T = promote_type(M0, M1, M2, M3)
-    ndims, nsmpls = size(x)
+        x::AbstractArray{<:Real},
+        w::AbstractArray{<:Real},
+        h::AbstractArray{<:Real},
+        d::AbstractArray{<:Real}
+    )
 
     compute_unit = get_compute_unit(x)
     n = compute_unit isa AbstractGPUnit ? 256 : Threads.nthreads()
     kernel! = rqs_backward_kernel!(compute_unit, n)
 
-    y = adapt(compute_unit, zeros(T, ndims, nsmpls))
-    logJac = adapt(compute_unit, zeros(T, ndims, nsmpls)) 
+    y = similar(x)
+    logJac = similar(x) 
     kernel!(x, y, logJac, w, h, d, ndrange=size(x))
     logJac = sum(logJac, dims=1)
 
@@ -438,12 +418,12 @@ function rqs_backward(
 end
 
 @kernel function rqs_backward_kernel!(
-        x::AbstractArray,
-        y::AbstractArray,
-        logJac::AbstractArray,
-        w::AbstractArray,
-        h::AbstractArray,
-        d::AbstractArray
+        x::AbstractArray{<:Real},
+        y::AbstractArray{<:Real},
+        logJac::AbstractArray{<:Real},
+        w::AbstractArray{<:Real},
+        h::AbstractArray{<:Real},
+        d::AbstractArray{<:Real}
     ) 
 
     i, j = @index(Global, NTuple)
