@@ -8,6 +8,7 @@ Test.@testset "Aqua tests" begin
     Aqua.test_all(
         MonotonicSplines,
         ambiguities = false,
+        piracy = false,
         project_toml_formatting = VERSION≥v"1.7"
     )
 end # testset

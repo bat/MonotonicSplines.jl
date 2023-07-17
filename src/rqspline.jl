@@ -1,213 +1,191 @@
-# This file is a part of MonotonicSplines.jl, licensed under the MIT License (MIT).
+# This file is a part of EuclidianNormalizingFlows.jl, licensed under the MIT License (MIT).
+"""
+    RQSpline(widths::AbstractArray{<:Real}, heights::AbstractArray{<:Real}, derivatives::AbstractArray{<:Real})
 
-# The spline implemented here is described in https://arxiv.org/abs/1906.04032 .
+Object holding the parameters to characterize several rational quadratic spline functions after the scheme 
+first defined by Gregory and Delbourgo in https://doi.org/10.1093/imanum/2.2.123.
+`RQSpline` holds the parameters to characterize `n_dims x n_samples` spline functions to transform 
+each component of `n_samples` samples.
 
-struct TrainableRQSpline <: Function
-    widths::AbstractMatrix{<:Real}
-    heights::AbstractMatrix{<:Real}
-    derivatives::AbstractMatrix{<:Real}
-end
-
-export TrainableRQSpline
-@functor TrainableRQSpline
-
+`widths`, `heights`, and `derivatives` are `K+1 x n_dims x n_samples` arrays, 
+with the parameters to characterize a single spline function with `K` segments in the first dimension. 
+Along the second dimension, the spline functions for a single sample are stored, and along the third dimension the sets 
+splines for differen samples.
+"""
 struct RQSpline <: Function
-    widths::AbstractMatrix{<:Real}
-    heights::AbstractMatrix{<:Real}
-    derivatives::AbstractMatrix{<:Real}
+    widths::AbstractArray{<:Real}
+    heights::AbstractArray{<:Real}
+    derivatives::AbstractArray{<:Real}
 end
 
 export RQSpline
 @functor RQSpline
 
-struct TrainableRQSplineInv <: Function
-    widths::AbstractMatrix{<:Real}
-    heights::AbstractMatrix{<:Real}
-    derivatives::AbstractMatrix{<:Real}
-end
-
-@functor TrainableRQSplineInv
-export TrainableRQSplineInv
-
-struct RQSplineInv <: Function
-    widths::AbstractMatrix{<:Real}
-    heights::AbstractMatrix{<:Real}
-    derivatives::AbstractMatrix{<:Real}
-end
-
-@functor RQSplineInv
-export RQSplineInv
-
-
-Base.:(==)(a::TrainableRQSpline, b::TrainableRQSpline) = a.widths == b.widths && a.heights == b.heights && a.derivatives == b.derivatives
-
-Base.isequal(a::TrainableRQSpline, b::TrainableRQSpline) = isequal(a.widths, b.widths) && isequal(a.heights, b.heights) && isequal(a.derivatives, b.derivatives)
-
-Base.hash(x::TrainableRQSpline, h::UInt) = hash(x.widths, hash(x.heights, hash(x.derivatives, hash(:TrainableRQSpline, hash(:EuclidianNormalizingFlows, h)))))
-
-(f::TrainableRQSpline)(x::AbstractMatrix{<:Real}) = spline_forward(f, x)[1]
+(f::RQSpline)(x::AbstractMatrix{<:Real}) = spline_forward(f, x)[1]
 
 function ChangesOfVariables.with_logabsdet_jacobian(
-    f::TrainableRQSpline,
+    f::RQSpline,
     x::AbstractMatrix{<:Real}
 )
     return spline_forward(f, x)
 end
 
-function InverseFunctions.inverse(f::TrainableRQSpline)
-    return TrainableRQSplineInv(f.widths, f.heights, f.derivatives)
+"""
+    InvRQSpline(widths::AbstractArray{<:Real}, heights::AbstractArray{<:Real}, derivatives::AbstractArray{<:Real})
+
+Object holding the parameters to characterize several inverse rational quadratic spline functions analogous to `InvRQSpline`.
+
+The same parameters are used to characterize the forward and inverse spline functions, the struct used to store them decides 
+the equation they are evaluated in. 
+"""
+struct InvRQSpline <: Function
+    widths::AbstractArray{<:Real}
+    heights::AbstractArray{<:Real}
+    derivatives::AbstractArray{<:Real}
 end
 
-Base.:(==)(a::TrainableRQSplineInv, b::TrainableRQSplineInv) = a.widths == b.widths && a.heights == b.heights && a.derivatives == b.derivatives
+@functor InvRQSpline
+export InvRQSpline
 
-Base.isequal(a::TrainableRQSplineInv, b::TrainableRQSplineInv) = isequal(a.widths, b.widths) && isequal(a.heights, b.heights) && isequal(a.derivatives, b.derivatives)
-
-Base.hash(x::TrainableRQSplineInv, h::UInt) = hash(x.widths, hash(x.heights, hash(x.derivatives, hash(:TrainableRQSplineInv, hash(:EuclidianNormalizingFlows, h)))))
-
-(f::TrainableRQSplineInv)(x::AbstractMatrix{<:Real}) = spline_backward(f, x)[1]
+(f::InvRQSpline)(x::AbstractMatrix{<:Real}) = spline_backward(f, x)[1]
 
 function ChangesOfVariables.with_logabsdet_jacobian(
-    f::TrainableRQSplineInv,
+    f::InvRQSpline,
     x::AbstractMatrix{<:Real}
 )
     return spline_backward(f, x)
 end
 
-function InverseFunctions.inverse(f::TrainableRQSplineInv)
-    return TrainableRQSpline(f.widths, f.heights, f.derivatives)
-end
-
 # Transformation forward: 
+"""
+    spline_forward(trafo::RQSpline, x::AbstractMatrix{<:Real})
 
-function spline_forward(trafo::TrainableRQSpline, x::AbstractMatrix{<:Real}; B=5.)
-
-    @assert size(trafo.widths, 1) == size(trafo.heights, 1) == size(trafo.derivatives, 1) == size(x, 1) >= 1
-    @assert size(trafo.widths, 2) == size(trafo.heights, 2) == (size(trafo.derivatives, 2) + 1) >= 2
-
-    ndims = size(x, 1)
-
-    w = _cumsum(_softmax(trafo.widths))
-    h = _cumsum(_softmax(trafo.heights))
-    d = _softplus(trafo.derivatives)
-
-    w = hcat(repeat([-B,], ndims,1), w)
-    h = hcat(repeat([-B,], ndims,1), h)
-    d = hcat(repeat([1,], ndims,1), d)
-    d = hcat(d, repeat([1,], ndims,1))
-
-    return spline_forward(RQSpline(w,h,d), x)
-end
-
+Apply the rational quadratic spline functions characterized by the parameters stored in `trafo` to the matrix `x`.
+The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
+"""
 function spline_forward(trafo::RQSpline, x::AbstractMatrix{<:Real})
-    return spline_forward(x, trafo.widths, trafo.heights, trafo.derivatives, trafo.widths, trafo.heights, trafo.derivatives)
+    return rqs_forward(x, trafo.widths, trafo.heights, trafo.derivatives)
 end
 
-function spline_forward(
-    x::AbstractArray{M0},
-    w::AbstractArray{M1},
-    h::AbstractArray{M2},
-    d::AbstractArray{M3},
-    w_logJac::AbstractArray{M4},
-    h_logJac::AbstractArray{M5},
-    d_logJac::AbstractArray{M6}
-) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
+"""
+    rqs_forward(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real})
 
-    T = promote_type(M0, M1, M2, M3, M4, M5, M6)
+Apply the rational quadratic spline functions characterized by `w`, `h`, and `d` to `x`. 
+The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
 
-    ndims = size(x, 1)
-    nsmpls = size(x, 2)
+Return the transformed values in a matrix `y` of the same shape as `x`, and return a `1 x size(x,2)` -matrix holding the sums of the values 
+of the logarithm of the absolute values of the determinant of the jacobians of the spline functions applied to a column of `x`.
 
-    y = zeros(T, ndims, nsmpls)
-    logJac = zeros(T, ndims, nsmpls)
+The function executes in a kernel, on the same backend as `x` is stored (CPU or GPU), the output will also be returned on the same backend.
+"""
+function rqs_forward(
+        x::AbstractArray{<:Real},
+        w::AbstractArray{<:Real},
+        h::AbstractArray{<:Real},
+        d::AbstractArray{<:Real}
+    ) 
 
-    device = KernelAbstractions.get_device(x)
-    n = device isa GPU ? 256 : 4
-    kernel! = spline_forward_kernel!(device, n)
+    compute_unit = get_compute_unit(x)
+    n = compute_unit isa AbstractGPUnit ? 256 : Threads.nthreads()
+    kernel! = rqs_forward_kernel!(compute_unit, n)
 
-    ev = kernel!(x, y, logJac, w, h, d, ndrange=size(x))
+    y = similar(x)
+    logJac = similar(x)
 
-    wait(ev)
+    kernel!(x, y, logJac, w, h, d, ndrange=size(x))
 
-    return y, sum(logJac, dims=1)
+    logJac = sum(logJac, dims=1)
+
+    return y, logJac
 end
 
+"""
+    rqs_forward_pullback(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, tangent_1::AbstractArray, tangent_2::AbstractArray)
 
-function spline_forward_pullback(
-        x::AbstractArray{M0},
-        w::AbstractArray{M1},
-        h::AbstractArray{M2},
-        d::AbstractArray{M3},
-        w_logJac::AbstractArray{M4},
-        h_logJac::AbstractArray{M5},
-        d_logJac::AbstractArray{M6},
-        tangent::ChainRulesCore.Tangent;
-    ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
+Return the gradients of the spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x`.
+The output will be on the same backend as `x` and `w`, `h`, and `d` (CPU or GPU).
+"""
+function rqs_forward_pullback(
+        x::AbstractArray{<:Real},
+        w::AbstractArray{<:Real},
+        h::AbstractArray{<:Real},
+        d::AbstractArray{<:Real},
+        tangent_1::AbstractArray{<:Real},
+        tangent_2::AbstractArray{<:Real};
+    ) 
 
-    T = promote_type(M0, M1, M2, M3, M4, M5, M6)
+    compute_unit = get_compute_unit(x)
+    n = compute_unit isa AbstractGPUnit ? 256 : Threads.nthreads()
 
-    ndims = size(x, 1)
-    nsmpls = size(x, 2)
-    nparams = size(w, 2) 
+    y = similar(x)
+    logJac = similar(x)
 
-    y = zeros(T, ndims, nsmpls)
-    logJac = zeros(T, ndims, nsmpls)
+    ∂y∂w = fill!(similar(w), zero(eltype(w)))
+    ∂y∂d = fill!(similar(h), zero(eltype(h)))
+    ∂y∂h = fill!(similar(d), zero(eltype(d)))
 
-    ∂y∂w = zeros(T, ndims, nparams)
-    ∂y∂h = zeros(T, ndims, nparams)
-    ∂y∂d = zeros(T, ndims, nparams+1)
+    ∂LogJac∂w = fill!(similar(w), zero(eltype(w)))
+    ∂LogJac∂h = fill!(similar(h), zero(eltype(h)))
+    ∂LogJac∂d = fill!(similar(d), zero(eltype(d)))
 
-    ∂LogJac∂w = zeros(T, ndims, nparams)
-    ∂LogJac∂h = zeros(T, ndims, nparams)
-    ∂LogJac∂d = zeros(T, ndims, nparams+1)
+    kernel! = rqs_forward_pullback_kernel!(compute_unit, n)
 
-    device = KernelAbstractions.get_device(x)
-    n = device isa GPU ? 256 : 4
-    kernel! = spline_forward_pullback_kernel!(device, n)
-
-    ev = kernel!(
+    kernel!(
         x, y, logJac, 
         w, h, d,
         ∂y∂w, ∂y∂h, ∂y∂d,
         ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d, 
-        tangent,
+        tangent_1,
+        tangent_2,
         ndrange=size(x)
         )
 
-    wait(ev)
     logJac = sum(logJac, dims=1)
 
-    return NoTangent(), @thunk(tangent[1] .* exp.(logJac)), ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d
+    return ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d
 end
 
-@kernel function spline_forward_kernel!(
-    x::AbstractArray,
-    y::AbstractArray,
-    logJac::AbstractArray,
-    w::AbstractArray,
-    h::AbstractArray,
-    d::AbstractArray
+""" 
+    rqs_forward_kernel!(x::AbstractArray, y::AbstractArray, logJac::AbstractArray, w::AbstractArray, h::AbstractArray, d::AbstractArray)
+
+Apply the rational quadratic spline functions characterized by `w`, `h`, and `d` to `x`. 
+The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
+
+The transformed values are stored in `y` the sums of the values of the logarithm of the absolute values of the determinant 
+of the jacobians of the spline functions applied to a column of `x` are stored in the corresponding column of `logJac`.
+
+To find the bin `k` in which the respective x value for a spline falls in, a the corresponding column of `w` is searched.j
+"""
+@kernel function rqs_forward_kernel!(
+    x::AbstractArray{<:Real},
+    y::AbstractArray{<:Real},
+    logJac::AbstractArray{<:Real},
+    w::AbstractArray{<:Real},
+    h::AbstractArray{<:Real},
+    d::AbstractArray{<:Real}
 )
+
     i, j = @index(Global, NTuple)
 
-    K = size(w, 2)
+    K = size(w, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(w[i,:], x[i,j]) - 1
+    k1 = searchsortedfirst_impl(view(w, :, i, j), x[i,j]) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
-    isinside = (k1 < K) && (k1 > 0)
+    isinside = (1 <= k1 <= K)
     k = Base.ifelse(isinside, k1, k2)
 
-    x_tmp = Base.ifelse(isinside, x[i,j], w[i,k]) # Simplifies calculations
-    (yᵢⱼ, LogJacᵢⱼ) = eval_forward_spline_params(w[i,k], w[i,k+1], h[i,k], h[i,k+1], d[i,k], d[i,k+1], x_tmp)
+    x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j]) # Simplifies calculations
+    (yᵢⱼ, LogJacᵢⱼ) = eval_forward_rqs_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
-    logJac[i, j] += Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
+    logJac[i, j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
 end
 
-
-@kernel function spline_forward_pullback_kernel!(
+"""
+    rqs_forward_pullback_kernel!(
         x::AbstractArray,
         y::AbstractArray,
         logJac::AbstractArray,
@@ -220,67 +198,85 @@ end
         ∂LogJac∂w_tangent::AbstractArray,
         ∂LogJac∂h_tangent::AbstractArray,
         ∂LogJac∂d_tangent::AbstractArray,
-        tangent::ChainRulesCore.Tangent
+        tangent_1::AbstractArray,
+        tangent_2::AbstractArray,
+    )
+Return the gradients of the rational quadratic spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x` and of `logJac`.
+The output will be on the same backend as `x` and `w`, `h`, and `d` (CPU or GPU).
+"""
+@kernel function rqs_forward_pullback_kernel!(
+        x::AbstractArray{<:Real},
+        y::AbstractArray{<:Real},
+        logJac::AbstractArray{<:Real},
+        w::AbstractArray{<:Real},
+        h::AbstractArray{<:Real},
+        d::AbstractArray{<:Real},
+        ∂y∂w_tangent::AbstractArray{<:Real},
+        ∂y∂h_tangent::AbstractArray{<:Real},
+        ∂y∂d_tangent::AbstractArray{<:Real},
+        ∂LogJac∂w_tangent::AbstractArray{<:Real},
+        ∂LogJac∂h_tangent::AbstractArray{<:Real},
+        ∂LogJac∂d_tangent::AbstractArray{<:Real},
+        tangent_1::AbstractArray{<:Real},
+        tangent_2::AbstractArray{<:Real},
     )
 
     i, j = @index(Global, NTuple)
 
-    K = size(w, 2)
+    # minus one is to account for left pad
+    K = size(w, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(w[i,:], x[i,j]) - 1
+    k1 = searchsortedfirst_impl(view(w, :, i, j), x[i,j]) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
-    isinside = (k1 < K) && (k1 > 0)
+    isinside = (1 <= k1 <= K)
     k = Base.ifelse(isinside, k1, k2)
 
-    x_tmp = Base.ifelse(isinside, x[i,j], w[i,k]) # Simplifies calculations
-    (yᵢⱼ, LogJacᵢⱼ, ∂y∂wₖ, ∂y∂hₖ, ∂y∂dₖ, ∂LogJac∂wₖ, ∂LogJac∂hₖ, ∂LogJac∂dₖ) = eval_forward_spline_params_with_grad(w[i,k], w[i,k+1], h[i,k], h[i,k+1], d[i,k], d[i,k+1], x_tmp)
+    x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j]) # Simplifies calculations
+    (yᵢⱼ, LogJacᵢⱼ, ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d) = eval_forward_rqs_params_with_grad(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
-    logJac[i, j] += Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
+    logJac[i,j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
 
-    left_edge_istrue = (1 < k < K)
-    left_edge_ind = Base.ifelse(left_edge_istrue, k-1, one(typeof(k)))
+    ∂y∂w_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂w[1], zero(eltype(∂y∂w)))
+    ∂y∂h_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂h[1], zero(eltype(∂y∂h)))
+    ∂y∂d_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂d[1], zero(eltype(∂y∂d)))
+    ∂LogJac∂w_tangent[k, i, j] = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂w[1], zero(eltype(∂LogJac∂w)))
+    ∂LogJac∂h_tangent[k, i, j] = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂h[1], zero(eltype(∂LogJac∂h)))
+    ∂LogJac∂d_tangent[k, i, j] = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂d[1], zero(eltype(∂LogJac∂d)))
 
-    @atomic ∂y∂w_tangent[i, left_edge_ind+1]      += tangent[1][i,j] * Base.ifelse(isinside * left_edge_istrue, ∂y∂wₖ[1], zero(eltype(∂y∂wₖ)))
-    @atomic ∂y∂h_tangent[i, left_edge_ind+1]      += tangent[1][i,j] * Base.ifelse(isinside * left_edge_istrue, ∂y∂hₖ[1], zero(eltype(∂y∂hₖ)))
-    @atomic ∂y∂d_tangent[i, left_edge_ind+1]      += tangent[1][i,j] * Base.ifelse(isinside * left_edge_istrue, ∂y∂dₖ[1], zero(eltype(∂y∂dₖ)))
-    @atomic ∂LogJac∂w_tangent[i, left_edge_ind+1] += tangent[2][1,j] * Base.ifelse(isinside * left_edge_istrue, ∂LogJac∂wₖ[1], zero(eltype(∂LogJac∂wₖ)))
-    @atomic ∂LogJac∂h_tangent[i, left_edge_ind+1] += tangent[2][1,j] * Base.ifelse(isinside * left_edge_istrue, ∂LogJac∂hₖ[1], zero(eltype(∂LogJac∂hₖ)))
-    @atomic ∂LogJac∂d_tangent[i, left_edge_ind+1] += tangent[2][1,j] * Base.ifelse(isinside * left_edge_istrue, ∂LogJac∂dₖ[1], zero(eltype(∂LogJac∂dₖ)))
- 
-    right_edge_istrue = (k < K - 1)
-    right_edge_ind = Base.ifelse(right_edge_istrue, k, one(typeof(k)))
-
-    @atomic ∂y∂w_tangent[i, right_edge_ind+1]       += tangent[1][i,j] * Base.ifelse(isinside * right_edge_istrue, ∂y∂wₖ[2], zero(eltype(∂y∂wₖ)))
-    @atomic ∂y∂h_tangent[i, right_edge_ind+1]       += tangent[1][i,j] * Base.ifelse(isinside * right_edge_istrue, ∂y∂hₖ[2], zero(eltype(∂y∂hₖ)))
-    @atomic ∂y∂d_tangent[i, right_edge_ind+1]       += tangent[1][i,j] * Base.ifelse(isinside * right_edge_istrue, ∂y∂dₖ[2], zero(eltype(∂y∂dₖ)))
-    @atomic ∂LogJac∂w_tangent[i, right_edge_ind+1]  += tangent[2][1,j] * Base.ifelse(isinside * right_edge_istrue, ∂LogJac∂wₖ[2], zero(eltype(∂LogJac∂wₖ)))
-    @atomic ∂LogJac∂h_tangent[i, right_edge_ind+1]  += tangent[2][1,j] * Base.ifelse(isinside * right_edge_istrue, ∂LogJac∂hₖ[2], zero(eltype(∂LogJac∂hₖ)))
-    @atomic ∂LogJac∂d_tangent[i, right_edge_ind+1]  += tangent[2][1,j] * Base.ifelse(isinside * right_edge_istrue, ∂LogJac∂dₖ[2], zero(eltype(∂LogJac∂dₖ)))
-
+    ∂y∂w_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂w[2], zero(eltype(∂y∂w)))
+    ∂y∂h_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂h[2], zero(eltype(∂y∂h)))
+    ∂y∂d_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂d[2], zero(eltype(∂y∂d)))
+    ∂LogJac∂w_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂w[2], zero(eltype(∂LogJac∂w)))
+    ∂LogJac∂h_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂h[2], zero(eltype(∂LogJac∂h)))
+    ∂LogJac∂d_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂d[2], zero(eltype(∂LogJac∂d))) # account for right pad in d?
 end
 
 function ChainRulesCore.rrule(
-    ::typeof(spline_forward),
-    x::AbstractArray{M0},
-    w::AbstractArray{M1},
-    h::AbstractArray{M2},
-    d::AbstractArray{M3},
-    w_logJac::AbstractArray{M4},
-    h_logJac::AbstractArray{M5},
-    d_logJac::AbstractArray{M6};
-) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real, M6<:Real}
+    ::typeof(rqs_forward),
+    x::AbstractArray{<:Real},
+    w::AbstractArray{<:Real},
+    h::AbstractArray{<:Real},
+    d::AbstractArray{<:Real}
+)
 
-    # To do: Rewrite to avoid repeating calculation. 
-    y, logJac = spline_forward(x, w, h, d, w_logJac, h_logJac, d_logJac)
-    pullback(tangent) = spline_forward_pullback(x, w, h, d, w_logJac, h_logJac, d_logJac, tangent)
+    y, logJac = rqs_forward(x, w, h, d)
+    compute_unit = get_compute_unit(x)
+
+    pullback(tangent) =(NoTangent(), @thunk(tangent_1 .* exp.(logJac)), rqs_forward_pullback(x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...)
+
     return (y, logJac), pullback
 end
 
-function eval_forward_spline_params(
+"""
+    eval_forward_rqs_params(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
+
+Apply a rational quadratic spline segment to `x`, and calculate the logarithm of the absolute value of this function's jacobian.
+"""
+function eval_forward_rqs_params(
     wₖ::Real, wₖ₊₁::Real, 
     hₖ::Real, hₖ₊₁::Real, 
     dₖ::Real, dₖ₊₁::Real, 
@@ -305,7 +301,13 @@ function eval_forward_spline_params(
     return y, logJac
 end
 
-function eval_forward_spline_params_with_grad(
+"""
+    eval_forward_rqs_params_with_grad(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
+
+Apply a rational quadratic spline segment to `x`, and calculate the logarithm of the absolute value of this function's jacobian.
+And calculate the gradient of that function depending on the spline parameters.
+"""
+function eval_forward_rqs_params_with_grad(
     wₖ::M0, wₖ₊₁::M0, 
     hₖ::M1, hₖ₊₁::M1, 
     dₖ::M2, dₖ₊₁::M2, 
@@ -374,85 +376,76 @@ end
 
 # Transformation backward: 
 
-function spline_backward(trafo::TrainableRQSplineInv, x::AbstractMatrix{<:Real};   B = 5.)
+"""
+    spline_backward(trafo::InvRQSpline, x::AbstractMatrix{<:Real})
 
-    @assert size(trafo.widths, 1) == size(trafo.heights, 1) == size(trafo.derivatives, 1) == size(x, 1)  >= 1
-    @assert size(trafo.widths, 2) == size(trafo.heights, 2) == (size(trafo.derivatives, 2) + 1)  >= 2
+Apply the inverse rational quadratic spline functions characterized by the parameters stored in `trafo` to the matrix `x`.
+The rational quadratic spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
+"""
+function spline_backward(trafo::InvRQSpline, x::AbstractMatrix{<:Real})
+    return rqs_backward(x, trafo.widths, trafo.heights, trafo.derivatives)
 
-    ndims = size(x, 1)
-
-    w = _cumsum(_softmax(trafo.widths))
-    h = _cumsum(_softmax(trafo.heights))
-    d = _softplus(trafo.derivatives)
-
-    w = hcat(repeat([-B,], ndims,1), w)
-    h = hcat(repeat([-B,], ndims,1), h)
-    d = hcat(repeat([1,], ndims,1), d)
-    d = hcat(d, repeat([1,], ndims,1))
-
-    return spline_backward(RQSplineInv(w, h, d), x)
 end
 
-function spline_backward(trafo::RQSplineInv, x::AbstractMatrix{<:Real})
-    return spline_backward(x, trafo.widths, trafo.heights, trafo.derivatives)
+"""
+    rqs_backward(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, w_logJac::AbstractArray{<:Real}, h_logJac::AbstractArray{<:Real}, d_logJac::AbstractArray{<:Real})
+
+Apply the inverse rational quadratic spline functions characterized by `w`, `h`, and `d` to `x`. 
+The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
+
+Return the transformed values in a matrix `y` of the same shape as `x`, and return a `1 x size(x,2)` -matrix holding the sums of the values 
+of the logarithm of the absolute values of the determinant of the jacobians of the spline functions applied to a column of `x`.
+
+The function executes in a kernel, on the same backend as `x` is stored (CPU or GPU), the output will also be returned on the same backend.
+"""
+function rqs_backward(
+        x::AbstractArray{<:Real},
+        w::AbstractArray{<:Real},
+        h::AbstractArray{<:Real},
+        d::AbstractArray{<:Real}
+    )
+
+    compute_unit = get_compute_unit(x)
+    n = compute_unit isa AbstractGPUnit ? 256 : Threads.nthreads()
+    kernel! = rqs_backward_kernel!(compute_unit, n)
+
+    y = similar(x)
+    logJac = similar(x) 
+    kernel!(x, y, logJac, w, h, d, ndrange=size(x))
+    logJac = sum(logJac, dims=1)
+
+    return y, logJac
 end
 
-
-function spline_backward(
-        x::AbstractArray{M0},
-        w::AbstractArray{M1},
-        h::AbstractArray{M2},
-        d::AbstractArray{M3},
-    ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
-
-    T = promote_type(M0, M1, M2, M3)
-
-    ndims = size(x, 1)
-    nsmpls = size(x, 2)
-
-    y = zeros(T, ndims, nsmpls)
-    logJac = zeros(T, ndims, nsmpls)
-
-    device = KernelAbstractions.get_device(x)
-    n = device isa GPU ? 256 : 4
-    kernel! = spline_backward_kernel!(device, n)
-
-    ev = kernel!(x, y, logJac, w, h, d, ndrange=size(x))
-
-    wait(ev)
-
-    return y, sum(logJac, dims=1)
-end
-
-@kernel function spline_backward_kernel!(
-        x::AbstractMatrix{M0},
-        y::AbstractMatrix{M1},
-        logJac::AbstractMatrix{M2},
-        w::AbstractMatrix{M3},
-        h::AbstractMatrix{M4},
-        d::AbstractMatrix{M5}
-    ) where {M0<:Real, M1<:Real, M2<:Real, M3<:Real, M4<:Real, M5<:Real,}
+@kernel function rqs_backward_kernel!(
+        x::AbstractArray{<:Real},
+        y::AbstractArray{<:Real},
+        logJac::AbstractArray{<:Real},
+        w::AbstractArray{<:Real},
+        h::AbstractArray{<:Real},
+        d::AbstractArray{<:Real}
+    ) 
 
     i, j = @index(Global, NTuple)
     
-    K = size(w, 2)
+    K = size(w, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(h[i,:], x[i,j]) - 1
+    k1 = searchsortedfirst_impl(view(h, :, i, j), x[i,j]) - 1
     k2 = one(typeof(k1))
 
-   # Is inside of range
-   isinside = (k1 < K) && (k1 > 0)
-   k = Base.ifelse(isinside, k1, k2)
+    # Is inside of range
+    isinside = (k1 < K) && (k1 > 0)
+    k = Base.ifelse(isinside, k1, k2)
 
-    x_tmp = Base.ifelse(isinside, x[i,j], h[i,k]) # Simplifies unnecessary calculations
-    (yᵢⱼ, LogJacᵢⱼ) = eval_backward_spline_params(w[i,k], w[i,k+1], h[i,k], h[i,k+1], d[i,k], d[i,k+1], x_tmp)
+    x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j])  # Simplifies unnecessary calculations
+    (yᵢⱼ, LogJacᵢⱼ) = eval_backward_rqs_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
-    logJac[i, j] += Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
+    logJac[i, j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
 end
 
-function eval_backward_spline_params(
+function eval_backward_rqs_params(
     wₖ::M0, wₖ₊₁::M0, 
     hₖ::M1, hₖ₊₁::M1, 
     dₖ::M2, dₖ₊₁::M2, 
@@ -482,66 +475,4 @@ function eval_backward_spline_params(
     LogJac = log(abs(Δx * grad)) - 2*log(abs(denom))
 
     return y, LogJac
-end
-
-# Utils: 
-
-function _softmax(x::AbstractVector)
-
-    exp_x = exp.(x)
-    sum_exp_x = sum(exp_x)
-
-    return exp_x ./ sum_exp_x 
-end
-
-function _softmax(x::AbstractMatrix)
-
-    val = cat([_softmax(i) for i in eachrow(x)]..., dims=2)'
-
-    return val 
-end
-
-function _cumsum(x::AbstractVector; B = 5)
-    return 2 .* B .* cumsum(x) .- B 
-end
-
-function _cumsum(x::AbstractMatrix)
-
-    return cat([_cumsum(i) for i in eachrow(x)]..., dims=2)'
-end
-
-function _softplus(x::AbstractVector)
-
-    return log.(exp.(x) .+ 1) 
-end
-
-function _softplus(x::AbstractMatrix)
-
-    val = cat([_softplus(i) for i in eachrow(x)]..., dims=2)'
-
-    return val
-end
-
-midpoint(lo::T, hi::T) where T<:Integer = lo + ((hi - lo) >>> 0x01)
-binary_log(x::T) where {T<:Integer} = 8 * sizeof(T) - leading_zeros(x - 1)
-
-function searchsortedfirst_impl(
-        v::AbstractVector, 
-        x::Real
-    )
-    
-    u = one(Integer)
-    lo = one(Integer) - u
-    hi = length(v) + u
-    
-    n = binary_log(length(v))+1
-    m = one(Integer)
-    
-    @inbounds for i in 1:n
-        m_1 = midpoint(lo, hi)
-        m = Base.ifelse(lo < hi - u, m_1, m)
-        lo = Base.ifelse(v[m] < x, m, lo)
-        hi = Base.ifelse(v[m] < x, hi, m)
-    end
-    return hi
 end
