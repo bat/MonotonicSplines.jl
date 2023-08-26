@@ -266,7 +266,7 @@ function ChainRulesCore.rrule(
     y, logJac = rqs_forward(x, w, h, d)
     compute_unit = get_compute_unit(x)
 
-    pullback(tangent) =(NoTangent(), @thunk(tangent_1 .* exp.(logJac)), rqs_forward_pullback(x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...)
+    pullback(tangent) =(NoTangent(), @thunk(tangent[1] .* exp.(logJac)), rqs_forward_pullback(x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...)
 
     return (y, logJac), pullback
 end
