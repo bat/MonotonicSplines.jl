@@ -142,7 +142,7 @@ function rqs_forward_pullback(
 
     logJac = sum(logJac, dims=1)
 
-    return ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d
+    return ∂y∂w + ∂LogJac∂w, ∂y∂h + ∂LogJac∂h, ∂y∂d + ∂LogJac∂d
 end
 
 """ 
@@ -252,7 +252,7 @@ The output will be on the same backend as `x` and `w`, `h`, and `d` (CPU or GPU)
     ∂y∂d_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂d[2], zero(eltype(∂y∂d)))
     ∂LogJac∂w_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂w[2], zero(eltype(∂LogJac∂w)))
     ∂LogJac∂h_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂h[2], zero(eltype(∂LogJac∂h)))
-    ∂LogJac∂d_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂d[2], zero(eltype(∂LogJac∂d))) # account for right pad in d?
+    ∂LogJac∂d_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂d[2], zero(eltype(∂LogJac∂d)))
 end
 
 function ChainRulesCore.rrule(
@@ -266,7 +266,7 @@ function ChainRulesCore.rrule(
     y, logJac = rqs_forward(x, w, h, d)
     compute_unit = get_compute_unit(x)
 
-    pullback(tangent) =(NoTangent(), @thunk(tangent[1] .* exp.(logJac)), rqs_forward_pullback(x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...)
+    pullback(tangent) = (NoTangent(), @thunk(tangent[1] .* exp.(logJac)), rqs_forward_pullback(x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...)
 
     return (y, logJac), pullback
 end
