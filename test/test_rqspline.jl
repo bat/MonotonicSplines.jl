@@ -31,7 +31,7 @@ for compute_unit in compute_units
     local RQS_test = RQSpline(test_params_processed...)
     local RQS_inv_test = InvRQSpline(test_params_processed...)
 
-    local rqs_forward_pullback_test = Tuple([reshape(readdlm("test_outputs/rqs_forward_pullback_test.txt")[i,:], 11, 1, 10) for i in 1:6])
+    local rqs_forward_pullback_test = Tuple([reshape(readdlm("test_outputs/rqs_forward_pullback_test.txt")[i,:], 11, 1, 10) for i in 1:3])
 
     local dydw_test = adapt(compute_unit, reshape(readdlm("test_outputs/dydw.txt"), 11,1,10))
     local dydh_test = adapt(compute_unit, reshape(readdlm("test_outputs/dydh.txt"), 11,1,10))
