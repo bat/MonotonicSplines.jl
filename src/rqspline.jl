@@ -1,16 +1,37 @@
 # This file is a part of EuclidianNormalizingFlows.jl, licensed under the MIT License (MIT).
+
 """
     RQSpline(widths::AbstractArray{<:Real}, heights::AbstractArray{<:Real}, derivatives::AbstractArray{<:Real})
 
-Object holding the parameters to characterize several rational quadratic spline functions after the scheme 
-first defined by Gregory and Delbourgo in https://doi.org/10.1093/imanum/2.2.123.
-`RQSpline` holds the parameters to characterize `n_dims x n_samples` spline functions to transform 
-each component of `n_samples` samples.
+A struct that holds the parameters to characterize multiple rational quadratic spline functions. 
+These functions are used to transform each component of multiple samples, providing a high-performance 
+solution for batch transformations.
 
-`widths`, `heights`, and `derivatives` are `K+1 x n_dims x n_samples` arrays, 
-with the parameters to characterize a single spline function with `K` segments in the first dimension. 
-Along the second dimension, the spline functions for a single sample are stored, and along the third dimension the sets 
-splines for differen samples.
+The `RQSpline` struct is based on the scheme first defined by Gregory and Delbourgo 
+(https://doi.org/10.1093/imanum/2.2.123) and is designed to handle `n_dims x n_samples` spline functions For a batch of 
+`n_samples` `n_dims`-dimensional samples.
+
+# Fields
+- `widths`: A `K+1 x n_dims x n_samples` array that holds the width parameters for each spline function. 
+  The first dimension corresponds to the number of segments in a single spline function, the second dimension 
+  corresponds to the spline functions for a single sample, and the third dimension corresponds to the sets of 
+  splines for different samples.
+
+- `heights`: A `K+1 x n_dims x n_samples` array that holds the height parameters for each spline function. 
+  The dimensions are organized in the same way as the `widths` array.
+
+- `derivatives`: A `K+1 x n_dims x n_samples` array that holds the derivative parameters for each spline function. 
+  The dimensions are organized in the same way as the `widths` and `heights` arrays.
+
+# Usage
+An instance of `RQSpline` can be used like a function to apply the characterized spline transformations 
+to the components of the samples.
+
+# Performance
+The struct is designed to leverage parallel computing and automatic differentiation for high performance. 
+It uses `KernelAbstractions.jl` for parallel execution on either a CPU or a GPU, and different backends for automatic 
+differentiation, providing precise and efficient gradient computations.
+
 """
 struct RQSpline <: Function
     widths::AbstractArray{<:Real}
@@ -33,10 +54,38 @@ end
 """
     InvRQSpline(widths::AbstractArray{<:Real}, heights::AbstractArray{<:Real}, derivatives::AbstractArray{<:Real})
 
-Object holding the parameters to characterize several inverse rational quadratic spline functions analogous to `InvRQSpline`.
+A struct that holds the parameters to characterize multiple inverse rational quadratic spline functions. 
+These functions are used to transform each component of multiple samples, providing a high-performance 
+solution for batch transformations.
 
-The same parameters are used to characterize the forward and inverse spline functions, the struct used to store them decides 
-the equation they are evaluated in. 
+The `InvRQSpline` struct is based on the scheme first defined by Gregory and Delbourgo 
+(https://doi.org/10.1093/imanum/2.2.123) and is designed to handle `n_dims x n_samples` inverse spline functions.
+
+# Fields
+- `widths`: A `K+1 x n_dims x n_samples` array that holds the width parameters for each inverse spline function. 
+  The first dimension corresponds to the number of segments in a single spline function, the second dimension 
+  corresponds to the inverse spline functions for a single sample, and the third dimension corresponds to the sets of 
+  inverse splines for different samples.
+
+- `heights`: A `K+1 x n_dims x n_samples` array that holds the height parameters for each inverse spline function. 
+  The dimensions are organized in the same way as the `widths` array.
+
+- `derivatives`: A `K+1 x n_dims x n_samples` array that holds the derivative parameters for each inverse spline function. 
+  The dimensions are organized in the same way as the `widths` and `heights` arrays.
+
+# Usage
+An instance of `InvRQSpline` can be used like a function to apply the characterized inverse spline transformations 
+to the components of the samples.
+
+# Performance
+The struct is designed to leverage parallel computing and automatic differentiation for high performance. 
+It uses `KernelAbstractions.jl` for parallel execution on either a CPU or a GPU, and `Zygote.jl` for automatic 
+differentiation, providing precise and efficient gradient computations.
+
+# Note
+The same parameters are used to characterize both the forward (`RQSpline`) and inverse (`InvRQSpline`) spline functions. 
+The struct used to store them determines the equation they are evaluated in.
+
 """
 struct InvRQSpline <: Function
     widths::AbstractArray{<:Real}
@@ -56,12 +105,35 @@ function ChangesOfVariables.with_logabsdet_jacobian(
     return spline_backward(f, x)
 end
 
-# Transformation forward: 
+# Transformation forward:
 """
     spline_forward(trafo::RQSpline, x::AbstractMatrix{<:Real})
 
-Apply the rational quadratic spline functions characterized by the parameters stored in `trafo` to the matrix `x`.
-The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
+Apply the rational quadratic spline functions, characterized by the parameters stored in `trafo`, to the matrix `x`.
+
+This function provides a high-performance solution for batch transformations, applying multiple spline functions 
+to a matrix of samples simultaneously. One sample is stored in a column of the input matrix `x`.
+
+# Arguments
+- `trafo`: An instance of `RQSpline` that holds the parameters of the spline functions. These parameters are
+  `widths`, `heights`, and `derivatives`, each of which is a 3D array with dimensions `K+1 x n_dims x n_samples`.
+
+- `x`: A matrix of real numbers to which the spline functions are applied. The `[i,j]`-th element of `x` is transformed 
+  by the spline function characterized by the parameters in the `[:,i,j]` entries in the parameter arrays stored in `trafo`.
+
+# Returns
+Two objects are returned:
+- `y`: A matrix of the same shape as `x` that holds the transformed values.
+- `logJac`: A `1 x size(x,2)` matrix that holds the sums of the values of the logarithm of the absolute values of the determinant 
+   of the Jacobians of the spline functions applied to a column of `x`.
+
+# Usage
+The function is used to apply the forward transformation characterized by an `RQSpline` instance to a matrix of samples.
+
+# Performance
+The function leverages parallel computing and automatic differentiation for high performance. 
+It uses `KernelAbstractions.jl` for parallel execution on either a CPU or a GPU, and different backends for automatic 
+differentiation, providing precise and efficient gradient computations.
 """
 function spline_forward(trafo::RQSpline, x::AbstractMatrix{<:Real})
     return rqs_forward(x, trafo.widths, trafo.heights, trafo.derivatives)
@@ -70,13 +142,26 @@ end
 """
     rqs_forward(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real})
 
-Apply the rational quadratic spline functions characterized by `w`, `h`, and `d` to `x`. 
-The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
+Apply the rational quadratic spline functions, characterized by the parameters `w` (widths), `h` (heights), and `d` (derivatives), 
+to the array `x`.
 
-Return the transformed values in a matrix `y` of the same shape as `x`, and return a `1 x size(x,2)` -matrix holding the sums of the values 
-of the logarithm of the absolute values of the determinant of the jacobians of the spline functions applied to a column of `x`.
+One sample is stored in a column of the input `x`.
 
-The function executes in a kernel, on the same backend as `x` is stored (CPU or GPU), the output will also be returned on the same backend.
+# Arguments
+- `x`: An array of real numbers to which the spline functions are applied. The `[i,j]`-th element of `x` is transformed 
+  by the spline function characterized by the parameters in the `[:,i,j]` entries in `w`, `h`, and `d`.
+
+- `w`, `h`, `d`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively. 
+  Each of these is a 3D array with dimensions `K+1 x n_dims x n_samples`.
+
+# Returns
+Two objects are returned:
+- `y`: A matrix of the same shape as `x` that holds the transformed values.
+- `logJac`: A `1 x size(x,2)` matrix that holds the sums of the values of the logarithm of the absolute values of the determinant 
+  of the Jacobians of the spline functions applied to a column of `x`.
+
+# Note
+The function executes in a kernel, on the same backend as `x` is stored on (CPU or GPU), and the output is also returned on this same backend.
 """
 function rqs_forward(
         x::AbstractArray{<:Real},
@@ -102,8 +187,29 @@ end
 """
     rqs_forward_pullback(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, tangent_1::AbstractArray, tangent_2::AbstractArray)
 
-Return the gradients of the spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x`.
-The output will be on the same backend as `x` and `w`, `h`, and `d` (CPU or GPU).
+Compute and return the gradients of the rational quadratic spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x` with respect to `w`, `h`, and `d`. 
+
+This function is designed to make the transformation using Rational Quadratic Splines in this package automatically differentiable. 
+
+# Arguments
+- `x`: An array of real numbers at which the spline functions are evaluated.
+- `w`, `h`, `d`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively.
+- `tangent_1`, `tangent_2`: Arrays that hold the tangent vectors for the transformed output and the log abs det jacobians respectively.
+
+# Returns
+Three values are returned:
+- `∂y∂w + ∂LogJac∂w`: The gradient of the spline functions with respect to `w`.
+- `∂y∂h + ∂LogJac∂h`: The gradient of the spline functions with respect to `h`.
+- `∂y∂d + ∂LogJac∂d`: The gradient of the spline functions with respect to `d`.
+
+# Usage
+The function is used to compute the gradients of the spline functions, making the transformation using Rational Quadratic Splines in this package automatically differentiable.
+
+# Performance
+The function leverages parallel computing for high performance. It uses `KernelAbstractions.jl` for parallel execution on either a CPU or a GPU.
+
+# Note
+The function executes in a kernel, on the same backend as `x` is stored (CPU or GPU), and the output is also returned on the same backend.
 """
 function rqs_forward_pullback(
         x::AbstractArray{<:Real},
@@ -145,16 +251,27 @@ function rqs_forward_pullback(
     return ∂y∂w + ∂LogJac∂w, ∂y∂h + ∂LogJac∂h, ∂y∂d + ∂LogJac∂d
 end
 
-""" 
+"""
     rqs_forward_kernel!(x::AbstractArray, y::AbstractArray, logJac::AbstractArray, w::AbstractArray, h::AbstractArray, d::AbstractArray)
 
-Apply the rational quadratic spline functions characterized by `w`, `h`, and `d` to `x`. 
-The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
+This kernel function applies the rational quadratic spline functions characterized by the parameters `w`, `h`, and `d` to `x`. 
 
-The transformed values are stored in `y` the sums of the values of the logarithm of the absolute values of the determinant 
-of the jacobians of the spline functions applied to a column of `x` are stored in the corresponding column of `logJac`.
+# Arguments
+- `x`: An array of real numbers to which the spline functions are applied.
+- `w`, `h`, `d`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively.
+- `y`: An array where the transformed values are stored.
+- `logJac`: An array where the sums of the values of the logarithm of the absolute values of the determinant of the Jacobians of the spline 
+functions applied to a column of `x` are stored.
 
-To find the bin `k` in which the respective x value for a spline falls in, a the corresponding column of `w` is searched.j
+# Description
+The function works by applying the spline function characterized by the parameters in the `[:,i,j]` entries in `w`, `h`, and `d` to the 
+`[i,j]`-th element of `x`. The transformed values are stored in `y` and the sums of the values of the logarithm of the absolute values of 
+the determinant of the Jacobians of the spline functions applied to a column of `x` are stored in `logJac`.
+
+To find the bin `k` in which the respective x value for a spline falls in, the corresponding column of `w` is searched.
+
+# Note
+This function is a kernel function and is used within the `rqs_forward` function to perform the transformation, and is not intended to be called directly by the user.
 """
 @kernel function rqs_forward_kernel!(
     x::AbstractArray{<:Real},
@@ -201,8 +318,24 @@ end
         tangent_1::AbstractArray,
         tangent_2::AbstractArray,
     )
-Return the gradients of the rational quadratic spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x` and of `logJac`.
-The output will be on the same backend as `x` and `w`, `h`, and `d` (CPU or GPU).
+
+This kernel function calculates the gradients of the rational quadratic spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x` and of `logJac`.
+
+# Arguments
+- `x`: An array of real numbers to which the spline functions are applied.
+- `w`, `h`, `d`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively.
+- `y`: An array where the transformed values are stored.
+- `logJac`: An array where the sums of the values of the logarithm of the absolute values of the determinant of the Jacobians of the spline functions applied to a column of `x` are stored.
+- `∂y∂w_tangent`, `∂y∂h_tangent`, `∂y∂d_tangent`: Arrays where the gradients of the spline functions with respect to `w`, `h`, and `d` are stored, respectively.
+- `∂LogJac∂w_tangent`, `∂LogJac∂h_tangent`, `∂LogJac∂d_tangent`: Arrays where the gradients of `logJac` with respect to `w`, `h`, and `d` are stored, respectively.
+- `tangent_1`, `tangent_2`: Arrays that hold the tangent vectors for the forward pass.
+
+# Description
+The transformed values are stored in `y` and the sums of the values of the logarithm of the absolute values of the determinant of the Jacobians of the spline functions applied to a column of `x` are stored in `logJac`. 
+The gradients of the spline functions and `logJac` with respect to `w`, `h`, and `d` are calculated and stored in the respective arrays. Meaning the corresponding input arrays are overwritten with the computed gradients.
+
+# Note
+This function is a kernel function and is used within the `rqs_forward_pullback` function to calculate the gradients of the spline functions and `logJac`. It is not intended to be called directly by the user.
 """
 @kernel function rqs_forward_pullback_kernel!(
         x::AbstractArray{<:Real},
@@ -274,7 +407,17 @@ end
 """
     eval_forward_rqs_params(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
 
-Apply a rational quadratic spline segment to `x`, and calculate the logarithm of the absolute value of this function's jacobian.
+Apply a rational quadratic spline segment to a number `x`, and calculate the logarithm of the absolute value of this function's Jacobian.
+
+# Arguments
+- `wₖ`, `wₖ₊₁`: The width parameters of the spline segment at the edges of the `k`-th interval.
+- `hₖ`, `hₖ₊₁`: The height parameters of the spline segment.
+- `dₖ`, `dₖ₊₁`: The derivative parameters of the spline segment.
+- `x`: The value at which the spline function is evaluated.
+
+# Returns
+- `y`: The transformed value after applying the rational quadratic spline segment to `x`.
+- `logJac`: The logarithm of the absolute value of the derivative of the segment at `x`.
 """
 function eval_forward_rqs_params(
     wₖ::Real, wₖ₊₁::Real, 
@@ -302,10 +445,22 @@ function eval_forward_rqs_params(
 end
 
 """
-    eval_forward_rqs_params_with_grad(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
+    eval_forward_rqs_params_with_grad(wₖ::M0, wₖ₊₁::M0, hₖ::M1, hₖ₊₁::M1, dₖ::M2, dₖ₊₁::M2, x::M3) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
 
-Apply a rational quadratic spline segment to `x`, and calculate the logarithm of the absolute value of this function's jacobian.
-And calculate the gradient of that function depending on the spline parameters.
+Apply a rational quadratic spline segment to `x`, calculate the logarithm of the absolute value of the derivative of the segment at `x`, 
+and compute the gradient of that segment with respect to the spline parameters.
+
+# Arguments
+- `wₖ`, `wₖ₊₁`: The width parameters of the spline segment at the edges of the `k`-th interval.
+- `hₖ`, `hₖ₊₁`: The height parameters of the spline segment.
+- `dₖ`, `dₖ₊₁`: The derivative parameters of the spline segment.
+- `x`: The value at which the spline function is evaluated.
+
+# Returns
+- `y`: The transformed value after applying the rational quadratic spline segment to `x`.
+- `logJac`: The logarithm of the absolute value of the derivative of the segment at `x`.
+- `∂y∂w`, `∂y∂h`, `∂y∂d`: The gradients of `y` with respect to the width, height, and derivative parameters, respectively.
+- `∂LogJac∂w`, `∂LogJac∂h`, `∂LogJac∂d`: The gradients of `logJac` with respect to the width, height, and derivative parameters, respectively.
 """
 function eval_forward_rqs_params_with_grad(
     wₖ::M0, wₖ₊₁::M0, 
@@ -375,28 +530,62 @@ function eval_forward_rqs_params_with_grad(
 end
 
 # Transformation backward: 
-
 """
     spline_backward(trafo::InvRQSpline, x::AbstractMatrix{<:Real})
 
-Apply the inverse rational quadratic spline functions characterized by the parameters stored in `trafo` to the matrix `x`.
-The rational quadratic spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
+Apply the inverse rational quadratic spline functions, characterized by the parameters stored in `trafo`, to the matrix `x`.
+
+This function provides a high-performance solution for batch transformations, applying multiple inverse spline functions 
+to a matrix of samples simultaneously. One sample is stored in a column of the input matrix `x`.
+
+# Arguments
+- `trafo`: An instance of `InvRQSpline` that holds the parameters of the inverse spline functions. These parameters are
+  `widths`, `heights`, and `derivatives`, each of which is a 3D array with dimensions `K+1 x n_dims x n_samples`.
+
+- `x`: A matrix of real numbers to which the inverse spline functions are applied. The `[i,j]`-th element of `x` is transformed 
+  by the inverse spline function characterized by the parameters in the `[:,i,j]` entries in the parameter arrays stored in `trafo`.
+
+# Returns
+Two objects are returned:
+- `y`: A matrix of the same shape as `x` that holds the transformed values.
+- `logJac`: A `1 x size(x,2)` matrix that holds the sums of the values of the logarithm of the absolute values of the determinant 
+    of the Jacobians of the spline functions applied to a column of `x`.
+
+# Usage
+The function is used to apply the backward transformation characterized by an `InvRQSpline` instance to a matrix of samples.
+
+# Performance
+The function leverages parallel computing and automatic differentiation for high performance. 
+It uses `KernelAbstractions.jl` for parallel execution on either a CPU or a GPU, and different backends for automatic 
+differentiation, providing precise and efficient gradient computations.
 """
 function spline_backward(trafo::InvRQSpline, x::AbstractMatrix{<:Real})
     return rqs_backward(x, trafo.widths, trafo.heights, trafo.derivatives)
-
 end
 
 """
-    rqs_backward(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, w_logJac::AbstractArray{<:Real}, h_logJac::AbstractArray{<:Real}, d_logJac::AbstractArray{<:Real})
+    rqs_backward(x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real})
 
-Apply the inverse rational quadratic spline functions characterized by `w`, `h`, and `d` to `x`. 
-The spline function characterized by the parameters in the `[:,i,j]` entries in `trafo` is applied to the `[i,j]`-th element of `x`.
+Apply the inverse rational quadratic spline functions, characterized by the parameters `w` (widths), `h` (heights), and `d` (derivatives), 
+to the array `x`.
 
-Return the transformed values in a matrix `y` of the same shape as `x`, and return a `1 x size(x,2)` -matrix holding the sums of the values 
-of the logarithm of the absolute values of the determinant of the jacobians of the spline functions applied to a column of `x`.
+One sample is stored in a column of the input `x`.
 
-The function executes in a kernel, on the same backend as `x` is stored (CPU or GPU), the output will also be returned on the same backend.
+# Arguments
+- `x`: An array of real numbers to which the inverse spline functions are applied. The `[i,j]`-th element of `x` is transformed 
+  by the inverse spline function characterized by the parameters in the `[:,i,j]` entries in `w`, `h`, and `d`.
+
+- `w`, `h`, `d`: Arrays that hold the width, height, and derivative parameters of the inverse spline functions, respectively. 
+  Each of these is a 3D array with dimensions `K+1 x n_dims x n_samples`.
+
+# Returns
+Two objects are returned:
+- `y`: A matrix of the same shape as `x` that holds the transformed values.
+- `logJac`: A `1 x size(x,2)` matrix that holds the sums of the values of the logarithm of the absolute values of the determinant 
+  of the Jacobians of the inverse spline functions applied to a column of `x`.
+
+# Note
+The function executes in a kernel, on the same backend as `x` is stored on (CPU or GPU), and the output is also returned on this same backend.
 """
 function rqs_backward(
         x::AbstractArray{<:Real},
@@ -417,6 +606,28 @@ function rqs_backward(
     return y, logJac
 end
 
+"""
+    rqs_backward_kernel!(x::AbstractArray, y::AbstractArray, logJac::AbstractArray, w::AbstractArray, h::AbstractArray, d::AbstractArray)
+
+This kernel function applies the inverse rational quadratic spline functions characterized by the parameters `w`, `h`, and `d` to `x`. 
+
+# Arguments
+- `x`: An array of real numbers to which the inverse spline functions are applied.
+- `w`, `h`, `d`: Arrays that hold the width, height, and derivative parameters of the inverse spline functions, respectively.
+- `y`: An array where the transformed values will be stored.
+- `logJac`: An array where the sums of the values of the logarithm of the absolute values of the determinant of the Jacobians of the inverse spline 
+functions applied to a column of `x` will be stored.
+
+# Description
+The function works by applying the inverse spline function characterized by the parameters in the `[:,i,j]` entries in `w`, `h`, and `d` to the 
+`[i,j]`-th element of `x`. The transformed values are stored in `y` and the sums of the values of the logarithm of the absolute values of 
+the determinant of the Jacobians of the inverse spline functions applied to a column of `x` are stored in `logJac`.
+
+To find the bin `k` in which the respective x value for a spline falls in, the corresponding column of `h` is searched.
+
+# Note
+This function is a kernel function and is used within the `rqs_backward` function to perform the transformation, and is not intended to be called directly by the user.
+"""
 @kernel function rqs_backward_kernel!(
         x::AbstractArray{<:Real},
         y::AbstractArray{<:Real},
@@ -445,6 +656,21 @@ end
     logJac[i, j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
 end
 
+"""
+    eval_forward_rqs_params(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
+
+Apply a rational quadratic spline segment to a number `x`, and calculate the logarithm of the absolute value of this function's derivative.
+
+# Arguments
+- `wₖ`, `wₖ₊₁`: The width parameters of the spline segment at the edges of the `k`-th interval.
+- `hₖ`, `hₖ₊₁`: The height parameters of the spline segment.
+- `dₖ`, `dₖ₊₁`: The derivative parameters of the spline segment.
+- `x`: The value at which the spline function is evaluated.
+
+# Returns
+- `y`: The transformed value after applying the rational quadratic spline segment to `x`.
+- `logJac`: The logarithm of the absolute value of the derivative of the segment at `x`.
+"""
 function eval_backward_rqs_params(
     wₖ::M0, wₖ₊₁::M0, 
     hₖ::M1, hₖ₊₁::M1, 

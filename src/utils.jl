@@ -3,12 +3,21 @@
 """
     get_params(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
 
-Process the raw output parameters of a neural net to be usable as the widths, heights and derivatives to characterize a set of rational quadratic spline functions.
-Outputs a tripel `w,h,d` containing the widths, heights, and derivative parameters, either on the CPU or GPU, depending on the backend of the input `θ_raw`.
+Process the raw output parameters of a neural network to generate parameters for a set of rational quadratic spline functions.
 
-The `θ_raw` should be a matrix, with the columns being the raw parameters for a sample.
-`n_dims_trafo` is the number of spline functions for which parameters are supposed to be produced.
-The output parameters are stored in an `K+1 x n_spline_functions_per_sample x n_samples` array.
+# Arguments
+- `θ_raw`: A matrix where each column represents the raw parameters for a sample.
+- `n_dims_trafo`: The number of spline functions for which parameters are to be produced.
+- `B`: A real number used to initialize the widths and heights of the spline functions. Default is 5.
+
+# Returns
+- A tuple `w, h, d` containing the widths, heights, and derivative parameters of the spline functions. The parameters are stored in a `K+1 x n_spline_functions_per_sample x n_samples` array.
+
+# Description
+The function reshapes `θ_raw` into a 3D array and then computes the widths `w`, heights `h`, and derivatives `d` of the spline functions. The computation of `w` and `h` involves a softmax operation to ensure that the widths and heights are positive and sum to 1, and a cumulative sum operation to ensure that the widths and heights are monotonically increasing. The computation of `d` involves a softplus operation to ensure that the derivatives are positive. The function uses the `adapt` function to ensure that the computations are performed on the same computing device (CPU or GPU) as `θ_raw`.
+
+# Note
+This function is typically used to process the output of a neural network before it is passed to a function that computes a transformation using rational quadratic spline functions.
 """
 function get_params(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
     N = size(θ_raw, 2)
@@ -27,9 +36,17 @@ end
 export get_params
 
 """
-    sort_dimensions(y₁::AbstractArray, y₂::AbstractArray, mask::AbstractVector)
+    _sort_dimensions(y₁::AbstractArray, y₂::AbstractArray, mask::AbstractVector)
 
-Output an array identical to `y₂`, but with the rows specified by `mask` overwritten with the corresponding rows in `y₁`.
+Create a new array by selectively replacing rows from `y₂` with corresponding rows from `y₁` based on a boolean mask, `mask`.
+
+# Arguments
+- `y₁`: An array from which rows are taken. It should have the same number of columns as `y₂`.
+- `y₂`: An array that serves as the base for the output. Rows specified by `mask` are replaced with corresponding rows from `y₁`.
+- `mask`: A boolean vector of the same length as the number of rows in `y₁` and `y₂`. If the i-th element of `mask` is true, the i-th row of `y₂` is replaced with the i-th row of `y₁` in the output.
+
+# Returns
+- `res`: An array of the same shape as `y₂`, but with rows specified by `mask` replaced with corresponding rows from `y₁`.
 """
 function _sort_dimensions(y₁::AbstractArray, y₂::AbstractArray, mask::AbstractVector)
     
