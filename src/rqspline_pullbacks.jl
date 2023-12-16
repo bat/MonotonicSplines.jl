@@ -111,11 +111,11 @@ The gradients of the spline functions and `logJac` with respect to `w`, `h`, and
 # Note
 This function is a kernel function and is used within the `rqs_forward_pullback` function to calculate the gradients of the spline functions and `logJac`. It is not intended to be called directly by the user.
 """
-@kernel function rqs_pullback_kernel(
+@kernel function rqs_pullback_kernel!(
         param_eval_function::Function,
         x::AbstractArray{<:Real},
         y::AbstractArray{<:Real},
-        logJac::AbstractArray{<:Real},
+        LogJac::AbstractArray{<:Real},
         w::AbstractArray{<:Real},
         h::AbstractArray{<:Real},
         d::AbstractArray{<:Real},
@@ -131,11 +131,13 @@ This function is a kernel function and is used within the `rqs_forward_pullback`
 
     i, j = @index(Global, NTuple)
 
-    # minus one is to account for left pad
+    # minus one to account for left pad
     K = size(w, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(view(w, :, i, j), x[i,j]) - 1
+    array_to_search = Base.ifelse(param_eval_function == eval_forward_rqs_params_with_grad, w, h)
+
+    k1 = searchsortedfirst_impl(view(array_to_search, :, i, j), x[i,j]) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
@@ -143,10 +145,12 @@ This function is a kernel function and is used within the `rqs_forward_pullback`
     k = Base.ifelse(isinside, k1, k2)
 
     x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j]) # Simplifies calculations
+
+    global g_state_rqs_pullback_kernel = (w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
     (yᵢⱼ, LogJacᵢⱼ, ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d) = param_eval_function(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
-    logJac[i,j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
+    LogJac[i,j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
 
     ∂y∂w_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂w[1], zero(eltype(∂y∂w)))
     ∂y∂h_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂h[1], zero(eltype(∂y∂h)))
@@ -175,7 +179,7 @@ function ChainRulesCore.rrule(
     y, logJac = rqs_forward(x, w, h, d)
     compute_unit = get_compute_unit(x)
 
-    pullback(tangent) = (NoTangent(), @thunk(tangent[1] .* exp.(logJac)), rqs_pullback(eval_forward_rqs_params_with_grad(), x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...)
+    pullback(tangent) = (NoTangent(), @thunk(tangent[1] .* exp.(logJac)), rqs_pullback(eval_forward_rqs_params_with_grad, x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...)
 
     return (y, logJac), pullback
 end
@@ -277,7 +281,7 @@ function ChainRulesCore.rrule(
     y, logJac = rqs_backward(x, w, h, d)
     compute_unit = get_compute_unit(x)
 
-    pullback(tangent) = (NoTangent(), @thunk(tangent[1] .* exp.(logJac)), rqs_pullback(eval_backward_rqs_params_with_grad(), x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...)
+    pullback(tangent) = (NoTangent(), @thunk(tangent[1] .* exp.(logJac)), rqs_pullback(eval_backward_rqs_params_with_grad, x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...)
 
     return (y, logJac), pullback
 end
@@ -344,8 +348,6 @@ function eval_backward_rqs_params_with_grad(
     ∂ζ∂wₖ   = -Δy2 * Δy / Δx^2
     ∂ζ∂hₖ   = (Δy2 + Δy) / Δx
     ∂ζ∂hₖ₊₁ = -Δy2 / Δx
-    ∂ζ∂dₖ   = 0
-    ∂ζ∂dₖ₊₁ = 0
 
     ∂θ∂wₖ   = (1/θ) * (β * ∂β∂wₖ   - 2 * (∂κ∂wₖ   * ζ + κ * ∂ζ∂wₖ  ))
     ∂θ∂hₖ   = (1/θ) * (β * ∂β∂hₖ   - 2 * (∂κ∂hₖ   * ζ + κ * ∂ζ∂hₖ  ))
@@ -368,14 +370,14 @@ function eval_backward_rqs_params_with_grad(
     ∂θ∂x∂wₖ   = (1 / θ) * (((∂β∂wₖ   * ∂β∂x + β * ∂β∂x∂wₖ  ) - 2 * (∂κ∂x∂wₖ   * ζ + ∂κ∂x * ∂ζ∂wₖ   + ∂κ∂wₖ   * ∂ζ∂x + κ * ∂ζ∂x∂wₖ  )) - ∂θ∂wₖ   * ∂θ∂x)
     ∂θ∂x∂hₖ   = (1 / θ) * (((∂β∂hₖ   * ∂β∂x + β * ∂β∂x∂hₖ  ) - 2 * (∂κ∂x∂hₖ   * ζ + ∂κ∂x * ∂ζ∂hₖ   + ∂κ∂hₖ   * ∂ζ∂x + κ * ∂ζ∂x∂hₖ  )) - ∂θ∂hₖ   * ∂θ∂x)
     ∂θ∂x∂hₖ₊₁ = (1 / θ) * (((∂β∂hₖ₊₁ * ∂β∂x + β * ∂β∂x∂hₖ₊₁) - 2 * (∂κ∂x∂hₖ₊₁ * ζ + ∂κ∂x * ∂ζ∂hₖ₊₁ + ∂κ∂hₖ₊₁ * ∂ζ∂x + κ * ∂ζ∂x∂hₖ₊₁)) - ∂θ∂hₖ₊₁ * ∂θ∂x)
-    ∂θ∂x∂dₖ   = (1 / θ) * (((∂β∂dₖ   * ∂β∂x - β) - 2 * (ζ + ∂κ∂x * ∂ζ∂dₖ   + ∂κ∂dₖ   * ∂ζ∂x)) - ∂θ∂dₖ   * ∂θ∂x)
-    ∂θ∂x∂dₖ₊₁ = (1 / θ) * (((∂β∂dₖ₊₁ * ∂β∂x - β) - 2 * (ζ + ∂κ∂x * ∂ζ∂dₖ₊₁ + ∂κ∂dₖ₊₁ * ∂ζ∂x)) - ∂θ∂dₖ₊₁ * ∂θ∂x)
+    ∂θ∂x∂dₖ   = (1 / θ) * (((∂β∂dₖ   * ∂β∂x - β) - 2 * (ζ + ∂κ∂dₖ   * ∂ζ∂x)) - ∂θ∂dₖ   * ∂θ∂x)
+    ∂θ∂x∂dₖ₊₁ = (1 / θ) * (((∂β∂dₖ₊₁ * ∂β∂x - β) - 2 * (ζ + ∂κ∂dₖ₊₁ * ∂ζ∂x)) - ∂θ∂dₖ₊₁ * ∂θ∂x)
 
     ∂μ∂wₖ   = 2 * (Δx * (∂ζ∂x∂wₖ   * (β + θ) + ∂ζ∂x * (∂β∂wₖ   + ∂θ∂wₖ)   - ∂ζ∂wₖ   * (∂β∂x + ∂θ∂x) - ζ * (∂β∂x∂wₖ   + ∂θ∂x∂wₖ)) - μ / (2*Δx))
     ∂μ∂hₖ   = 2 * (Δx * (∂ζ∂x∂hₖ   * (β + θ) + ∂ζ∂x * (∂β∂hₖ   + ∂θ∂hₖ)   - ∂ζ∂hₖ   * (∂β∂x + ∂θ∂x) - ζ * (∂β∂x∂hₖ   + ∂θ∂x∂hₖ)))
     ∂μ∂hₖ₊₁ = 2 * (Δx * (∂ζ∂x∂hₖ₊₁ * (β + θ) + ∂ζ∂x * (∂β∂hₖ₊₁ + ∂θ∂hₖ₊₁) - ∂ζ∂hₖ₊₁ * (∂β∂x + ∂θ∂x) - ζ * (∂β∂x∂hₖ₊₁ + ∂θ∂x∂hₖ₊₁)))
-    ∂μ∂dₖ   = 2 * (Δx * (∂ζ∂x * (∂β∂dₖ   + ∂θ∂dₖ)   - ∂ζ∂dₖ   * (∂β∂x + ∂θ∂x) - ζ * (∂θ∂x∂dₖ   - 1)))
-    ∂μ∂dₖ₊₁ = 2 * (Δx * (∂ζ∂x * (∂β∂dₖ₊₁ + ∂θ∂dₖ₊₁) - ∂ζ∂dₖ₊₁ * (∂β∂x + ∂θ∂x) - ζ * (∂θ∂x∂dₖ₊₁ - 1)))
+    ∂μ∂dₖ   = 2 * (Δx * (∂ζ∂x * (∂β∂dₖ   + ∂θ∂dₖ)   - ζ * (∂θ∂x∂dₖ   - 1)))
+    ∂μ∂dₖ₊₁ = 2 * (Δx * (∂ζ∂x * (∂β∂dₖ₊₁ + ∂θ∂dₖ₊₁) - ζ * (∂θ∂x∂dₖ₊₁ - 1)))
 
     ∂y∂wₖ   = 2 * (Δx * ((ζ * (∂β∂wₖ   + ∂θ∂wₖ  )) / (β + θ)^2 - ∂ζ∂wₖ   / (β + θ)) + ζ/(β + θ)) + 1
     ∂y∂wₖ₊₁ = -∂y∂wₖ + 1
@@ -394,7 +396,7 @@ function eval_backward_rqs_params_with_grad(
     # Transformed output
     y =  wₖ - 2 * (ζ / (β + θ)) * Δx
 
-    # LogJacobian
+    # LogJacobian, logaritm of the absolute value of ∂y/∂x
     LogJac = log(abs(μ)) - 2*log(abs(β + θ))
 
     ∂y∂w = (∂y∂wₖ, ∂y∂wₖ₊₁)
@@ -407,7 +409,3 @@ function eval_backward_rqs_params_with_grad(
 
     return y, LogJac, ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d
 end
-
-# For debugging 
-export eval_backward_rqs_params_with_grad
-export eval_forward_rqs_params_with_grad
