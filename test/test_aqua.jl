@@ -8,6 +8,6 @@ Test.@testset "Aqua tests" begin
     Aqua.test_all(
         MonotonicSplines,
         ambiguities = false,
-        piracy = false
+        piracies = false
     )
 end # testset
