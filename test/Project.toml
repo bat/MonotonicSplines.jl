@@ -13,4 +13,4 @@ KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
-Documenter = "~0.27"
+Documenter = "1"
