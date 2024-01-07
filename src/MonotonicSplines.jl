@@ -27,6 +27,7 @@ using Functors: @functor
 using KernelAbstractions
 
 include("rqspline.jl")
+include("rqspline_pullbacks.jl")
 include("utils.jl")
 
 end # module
