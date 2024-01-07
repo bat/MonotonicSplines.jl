@@ -31,7 +31,7 @@ makedocs(
     ],
     doctest = ("fixdoctests" in ARGS) ? :fix : true,
     linkcheck = !("nonstrict" in ARGS),
-    strict = !("nonstrict" in ARGS),
+    checkdocs = ("nonstrict" in ARGS) ? :none : :exports,
 )
 
 deploydocs(

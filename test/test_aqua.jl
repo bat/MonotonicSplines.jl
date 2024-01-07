@@ -7,8 +7,7 @@ import MonotonicSplines
 Test.@testset "Aqua tests" begin
     Aqua.test_all(
         MonotonicSplines,
-        ambiguities = false,
-        piracy = false,
-        project_toml_formatting = VERSION≥v"1.7"
+        ambiguities = true,
+        piracies=false # we are currently overloading some KernelAbstractions.jl functions, so we don't want to test for piracy
     )
 end # testset

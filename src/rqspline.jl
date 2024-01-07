@@ -126,14 +126,6 @@ Two objects are returned:
 - `y`: A matrix of the same shape as `x` that holds the transformed values.
 - `logJac`: A `1 x size(x,2)` matrix that holds the sums of the values of the logarithm of the absolute values of the determinant 
    of the Jacobians of the spline functions applied to a column of `x`.
-
-# Usage
-The function is used to apply the forward transformation characterized by an `RQSpline` instance to a matrix of samples.
-
-# Performance
-The function leverages parallel computing and automatic differentiation for high performance. 
-It uses `KernelAbstractions.jl` for parallel execution on either a CPU or a GPU, and different backends for automatic 
-differentiation, providing precise and efficient gradient computations.
 """
 function spline_forward(trafo::RQSpline, x::AbstractMatrix{<:Real})
     return rqs_forward(x, trafo.widths, trafo.heights, trafo.derivatives)
@@ -159,9 +151,6 @@ Two objects are returned:
 - `y`: A matrix of the same shape as `x` that holds the transformed values.
 - `logJac`: A `1 x size(x,2)` matrix that holds the sums of the values of the logarithm of the absolute values of the determinant 
   of the Jacobians of the spline functions applied to a column of `x`.
-
-# Note
-The function executes in a kernel, on the same backend as `x` is stored on (CPU or GPU), and the output is also returned on this same backend.
 """
 function rqs_forward(
         x::AbstractArray{<:Real},
@@ -201,10 +190,8 @@ The function works by applying the spline function characterized by the paramete
 `[i,j]`-th element of `x`. The transformed values are stored in `y` and the sums of the values of the logarithm of the absolute values of 
 the determinant of the Jacobians of the spline functions applied to a column of `x` are stored in `logJac`.
 
-To find the bin `k` in which the respective x value for a spline falls in, the corresponding column of `w` is searched.
-
 # Note
-This function is a kernel function and is used within the `rqs_forward` function to perform the transformation, and is not intended to be called directly by the user.
+To find the bin `k` in which the respective x value for a spline falls in, the corresponding column of `w` is searched.
 """
 @kernel function rqs_forward_kernel!(
     x::AbstractArray{<:Real},
@@ -295,14 +282,6 @@ Two objects are returned:
 - `y`: A matrix of the same shape as `x` that holds the transformed values.
 - `logJac`: A `1 x size(x,2)` matrix that holds the sums of the values of the logarithm of the absolute values of the determinant 
     of the Jacobians of the spline functions applied to a column of `x`.
-
-# Usage
-The function is used to apply the backward transformation characterized by an `InvRQSpline` instance to a matrix of samples.
-
-# Performance
-The function leverages parallel computing and automatic differentiation for high performance. 
-It uses `KernelAbstractions.jl` for parallel execution on either a CPU or a GPU, and different backends for automatic 
-differentiation, providing precise and efficient gradient computations.
 """
 function spline_backward(trafo::InvRQSpline, x::AbstractMatrix{<:Real})
     return rqs_backward(x, trafo.widths, trafo.heights, trafo.derivatives)
@@ -328,9 +307,6 @@ Two objects are returned:
 - `y`: A matrix of the same shape as `x` that holds the transformed values.
 - `logJac`: A `1 x size(x,2)` matrix that holds the sums of the values of the logarithm of the absolute values of the determinant 
   of the Jacobians of the inverse spline functions applied to a column of `x`.
-
-# Note
-The function executes in a kernel, on the same backend as `x` is stored on (CPU or GPU), and the output is also returned on this same backend.
 """
 function rqs_backward(
         x::AbstractArray{<:Real},
@@ -362,16 +338,6 @@ This kernel function applies the inverse rational quadratic spline functions cha
 - `y`: An array where the transformed values will be stored.
 - `logJac`: An array where the sums of the values of the logarithm of the absolute values of the determinant of the Jacobians of the inverse spline 
 functions applied to a column of `x` will be stored.
-
-# Description
-The function works by applying the inverse spline function characterized by the parameters in the `[:,i,j]` entries in `w`, `h`, and `d` to the 
-`[i,j]`-th element of `x`. The transformed values are stored in `y` and the sums of the values of the logarithm of the absolute values of 
-the determinant of the Jacobians of the inverse spline functions applied to a column of `x` are stored in `logJac`.
-
-To find the bin `k` in which the respective x value for a spline falls in, the corresponding column of `h` is searched.
-
-# Note
-This function is a kernel function and is used within the `rqs_backward` function to perform the transformation, and is not intended to be called directly by the user.
 """
 @kernel function rqs_backward_kernel!(
         x::AbstractArray{<:Real},

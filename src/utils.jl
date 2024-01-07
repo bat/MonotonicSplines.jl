@@ -12,12 +12,6 @@ Process the raw output parameters of a neural network to generate parameters for
 
 # Returns
 - A tuple `w, h, d` containing the widths, heights, and derivative parameters of the spline functions. The parameters are stored in a `K+1 x n_spline_functions_per_sample x n_samples` array.
-
-# Description
-The function reshapes `θ_raw` into a 3D array and then computes the widths `w`, heights `h`, and derivatives `d` of the spline functions. The computation of `w` and `h` involves a softmax operation to ensure that the widths and heights are positive and sum to 1, and a cumulative sum operation to ensure that the widths and heights are monotonically increasing. The computation of `d` involves a softplus operation to ensure that the derivatives are positive. The function uses the `adapt` function to ensure that the computations are performed on the same computing device (CPU or GPU) as `θ_raw`.
-
-# Note
-This function is typically used to process the output of a neural network before it is passed to a function that computes a transformation using rational quadratic spline functions.
 """
 function get_params(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
     N = size(θ_raw, 2)

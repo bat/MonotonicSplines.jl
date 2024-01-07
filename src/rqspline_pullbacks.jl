@@ -104,10 +104,6 @@ This kernel function calculates the gradients of the rational quadratic spline f
 
 For an explanation of the shape and contents of the gradient arrays, see the documentation of the [`rqs_pullback()`](@ref) function.
 
-# Description
-The transformed values are stored in `y` and the sums of the values of the logarithm of the absolute values of the determinant of the Jacobians of the spline functions applied to a column of `x` are stored in `logJac`. 
-The gradients of the spline functions and `logJac` with respect to `w`, `h`, and `d` are calculated and stored in the respective arrays. Meaning the corresponding input arrays are overwritten with the computed gradients.
-
 # Note
 This function is a kernel function and is used within the `rqs_forward_pullback` function to calculate the gradients of the spline functions and `logJac`. It is not intended to be called directly by the user.
 """
@@ -146,7 +142,6 @@ This function is a kernel function and is used within the `rqs_forward_pullback`
 
     x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j]) # Simplifies calculations
 
-    global g_state_rqs_pullback_kernel = (w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
     (yᵢⱼ, LogJacᵢⱼ, ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d) = param_eval_function(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
