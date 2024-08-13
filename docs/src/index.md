@@ -14,10 +14,10 @@ The splines defined here support the [ChangesOfVariables](https://github.com/Jul
 The package uses [KernelAbstractions](https://github.com/JuliaGPU/KernelAbstractions.jl) to provide both GPU and multi-vendor GPU support.
 
 
-## Manual Outline
+## Table of contents
 ---
 
 ```@contents
-Pages = ["introduction.md","implementation.md"]
+Pages = ["introduction.md", "api.md"]
 Depth = 3
 ```
