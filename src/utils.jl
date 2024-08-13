@@ -30,7 +30,8 @@ end
 
 export get_params
 
-"""
+# Non-public:
+#=
     _sort_dimensions(y₁::AbstractArray, y₂::AbstractArray, mask::AbstractVector)
 
 Create a new array by selectively replacing rows from `y₂` with corresponding rows from `y₁` based on a boolean mask, `mask`.
@@ -42,7 +43,7 @@ Create a new array by selectively replacing rows from `y₂` with corresponding 
 
 # Returns
 - `res`: An array of the same shape as `y₂`, but with rows specified by `mask` replaced with corresponding rows from `y₁`.
-"""
+=#
 function _sort_dimensions(y₁::AbstractArray, y₂::AbstractArray, mask::AbstractVector)
     
     if mask[1]

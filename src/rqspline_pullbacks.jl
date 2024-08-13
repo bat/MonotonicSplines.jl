@@ -1,6 +1,7 @@
 # This file is a part of MonotonicSplines.jl, licensed under the MIT License (MIT).
 
-"""
+# Non-public:
+#=
     rqs_pullback(param_eval_function::Function, x::AbstractArray{<:Real}, pX::AbstractArray{<:Real}, pY::AbstractArray{<:Real}, dYdX::AbstractArray{<:Real}, tangent_1::AbstractArray, tangent_2::AbstractArray)
 
 Compute the gradients of the rational quadratic spline functions characterized by `pX`, `pY`, and `dYdX`, evaluated at the values in `x` with respect to `pX`, `pY`, and `dYdX`. 
@@ -28,7 +29,7 @@ For example, if the `[j,k]` -th element of `x` falls in the `l`-th bin of the in
 the (generally non-zero) values `∂yⱼₖ/∂pXₗⱼₖ + ∂(log(abs(∂yⱼₖ/∂xⱼₖ)))/∂pXₗⱼₖ` and `∂yⱼₖ/∂pXₗ₊₁ⱼₖ + ∂(log(abs(∂yⱼₖ/∂xⱼₖ)))/∂pXₗ₊₁ⱼₖ` respectively.
 
 The function executes in a kernel, on the same backend as `x` is stored (CPU or GPU), and the output is also returned on the same backend.
-"""
+=#
 function rqs_pullback(
     param_eval_function::Function,
     x::AbstractArray{<:Real},
@@ -69,7 +70,9 @@ function rqs_pullback(
     return ∂y∂pX + ∂LogJac∂pX, ∂y∂pY + ∂LogJac∂pY, ∂y∂dYdX + ∂LogJac∂dYdX
 end
 
-"""
+
+# Non-public:
+#=
     rqs_pullback_kernel(
         param_eval_function::Function,
         x::AbstractArray,
@@ -104,7 +107,7 @@ For an explanation of the shape and contents of the gradient arrays, see the doc
 
 # Note
 This function is a kernel function and is used within the `rqs_forward_pullback` function to calculate the gradients of the spline functions and `logJac`. It is not intended to be called directly by the user.
-"""
+=#
 @kernel function rqs_pullback_kernel!(
         param_eval_function::Function,
         x::AbstractArray{<:Real},
@@ -161,7 +164,8 @@ This function is a kernel function and is used within the `rqs_forward_pullback`
 end
 
 
-"""
+# Non-public:
+#=
     eval_forward_rqs_params_with_grad(pXₖ::M0, pXₖ₊₁::M0, pYₖ::M1, pYₖ₊₁::M1, dYdXₖ::M2, dYdXₖ₊₁::M2, x::M3) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
 
 Apply a rational quadratic spline segment to `x`, calculate the logarithm of the absolute value of the derivative ("LogJac") of the segment at `x`, 
@@ -178,7 +182,7 @@ and compute the gradient of that segment and the LogJac with respect to the spli
 - `logJac`: The logarithm of the absolute value of the derivative of the segment at `x`.
 - `∂y∂pX`, `∂y∂pY`, `∂y∂dYdX`: The gradients of `y` with respect to the two width, height, and derivative parameters, respectively.
 - `∂LogJac∂pX`, `∂LogJac∂pY`, `∂LogJac∂dYdX`: The gradients of `logJac` with respect to the two width, height, and derivative parameters, respectively.
-"""
+=#
 function eval_forward_rqs_params_with_grad(
     pXₖ::M0, pXₖ₊₁::M0, 
     pYₖ::M1, pYₖ₊₁::M1, 
@@ -247,7 +251,8 @@ function eval_forward_rqs_params_with_grad(
 end
 
 
-"""
+# Non-public:
+#=
     eval_inverse_rqs_params_with_grad(pXₖ::M0, pXₖ₊₁::M0, 
                                        pYₖ::M1, pYₖ₊₁::M1, 
                                        dYdXₖ::M2, dYdXₖ₊₁::M2, 
@@ -267,7 +272,7 @@ and compute the gradient of that segment and the LogJac with respect to the spli
 - `logJac`: The logarithm of the absolute value of the derivative of the segment at `x`.
 - `∂y∂pX`, `∂y∂pY`, `∂y∂dYdX`: The gradients of `y` with respect to the two width, height, and derivative parameters, respectively.
 - `∂LogJac∂pX`, `∂LogJac∂pY`, `∂LogJac∂dYdX`: The gradients of `LogJac` with respect to the two width, height, and derivative parameters, respectively.
-"""
+=#
 function eval_inverse_rqs_params_with_grad(
     pXₖ::M0, pXₖ₊₁::M0, 
     pYₖ::M1, pYₖ₊₁::M1, 

@@ -200,7 +200,8 @@ end
 end
 
 
-"""
+# Non-public:
+#=
     MonotonicSplines.eval_forward_rqs_params(pXₖ::Real, pXₖ₊₁::Real, pYₖ::Real, pYₖ₊₁::Real, dYdXₖ::Real, dYdXₖ₊₁::Real, x::Real)
 
 Apply a rational quadratic spline segment to a number `x`, and calculate the logarithm of the absolute value of this function's Jacobian.
@@ -214,7 +215,7 @@ Apply a rational quadratic spline segment to a number `x`, and calculate the log
 # Returns
 - `y`: The transformed value after applying the rational quadratic spline segment to `x`.
 - `logJac`: The logarithm of the absolute value of the derivative of the segment at `x`.
-"""
+=#
 function eval_forward_rqs_params(
     pXₖ::Real, pXₖ₊₁::Real, 
     pYₖ::Real, pYₖ₊₁::Real, 
@@ -326,7 +327,7 @@ end
 end
 
 
-"""
+#=
     MonotonicSplines.eval_inverse_rqs_params(pXₖ::Real, pXₖ₊₁::Real, pYₖ::Real, pYₖ₊₁::Real, dYdXₖ::Real, dYdXₖ₊₁::Real, x::Real)
 
 Apply a rational quadratic spline segment to a number `x`, and calculate the logarithm of the absolute value of this function's derivative.
@@ -340,7 +341,7 @@ Apply a rational quadratic spline segment to a number `x`, and calculate the log
 # Returns
 - `y`: The transformed value after applying the rational quadratic spline segment to `x`.
 - `logJac`: The logarithm of the absolute value of the derivative of the segment at `x`.
-"""
+=#
 function eval_inverse_rqs_params(
     pXₖ::M0, pXₖ₊₁::M0, 
     pYₖ::M1, pYₖ₊₁::M1, 
