@@ -19,8 +19,6 @@ import ChangesOfVariables
 
 using HeterogeneousComputing
 
-import InverseFunctions
-
 import Functors
 using Functors: @functor
 

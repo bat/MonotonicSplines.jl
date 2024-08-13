@@ -102,9 +102,6 @@ end
 @functor InvRQSpline
 export InvRQSpline
 
-InverseFunctions.inverse(f::RQSpline) = InvRQSpline(f.widths, f.heights, f.derivatives)
-InverseFunctions.inverse(f::InvRQSpline) = RQSpline(f.widths, f.heights, f.derivatives)
-
 (f::InvRQSpline)(x::AbstractMatrix{<:Real}) = spline_backward(f, x)[1]
 
 function ChangesOfVariables.with_logabsdet_jacobian(
