@@ -12,18 +12,18 @@ using ChainRulesCore: @thunk, NoTangent
 function ChainRulesCore.rrule(
     ::typeof(rqs_forward),
     x::AbstractArray{<:Real},
-    w::AbstractArray{<:Real},
-    h::AbstractArray{<:Real},
-    d::AbstractArray{<:Real}
+    pX::AbstractArray{<:Real},
+    pY::AbstractArray{<:Real},
+    dYdX::AbstractArray{<:Real}
 )
 
-    y, logJac = rqs_forward(x, w, h, d)
+    y, logJac = rqs_forward(x, pX, pY, dYdX)
     compute_unit = get_compute_unit(x)
 
     pullback(tangent) = (
         NoTangent(),
         @thunk(tangent[1] .* exp.(logJac)),
-        rqs_pullback(eval_forward_rqs_params_with_grad, x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...
+        rqs_pullback(eval_forward_rqs_params_with_grad, x, pX, pY, dYdX, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...
     )
 
     return (y, logJac), pullback
@@ -33,18 +33,18 @@ end
 function ChainRulesCore.rrule(
     ::typeof(rqs_inverse),
     x::AbstractArray{<:Real},
-    w::AbstractArray{<:Real},
-    h::AbstractArray{<:Real},
-    d::AbstractArray{<:Real}
+    pX::AbstractArray{<:Real},
+    pY::AbstractArray{<:Real},
+    dYdX::AbstractArray{<:Real}
 )
 
-    y, logJac = rqs_inverse(x, w, h, d)
+    y, logJac = rqs_inverse(x, pX, pY, dYdX)
     compute_unit = get_compute_unit(x)
 
     pullback(tangent) = (
         NoTangent(),
         @thunk(tangent[1] .* exp.(logJac)),
-        rqs_pullback(eval_inverse_rqs_params_with_grad, x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...
+        rqs_pullback(eval_inverse_rqs_params_with_grad, x, pX, pY, dYdX, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...
     )
 
     return (y, logJac), pullback

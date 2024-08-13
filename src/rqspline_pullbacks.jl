@@ -1,9 +1,9 @@
 # This file is a part of MonotonicSplines.jl, licensed under the MIT License (MIT).
 
 """
-    rqs_pullback(param_eval_function::Function, x::AbstractArray{<:Real}, w::AbstractArray{<:Real}, h::AbstractArray{<:Real}, d::AbstractArray{<:Real}, tangent_1::AbstractArray, tangent_2::AbstractArray)
+    rqs_pullback(param_eval_function::Function, x::AbstractArray{<:Real}, pX::AbstractArray{<:Real}, pY::AbstractArray{<:Real}, dYdX::AbstractArray{<:Real}, tangent_1::AbstractArray, tangent_2::AbstractArray)
 
-Compute the gradients of the rational quadratic spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x` with respect to `w`, `h`, and `d`. 
+Compute the gradients of the rational quadratic spline functions characterized by `pX`, `pY`, and `dYdX`, evaluated at the values in `x` with respect to `pX`, `pY`, and `dYdX`. 
 
 This function is designed to make the transformation using Rational Quadratic Splines in this package automatically differentiable.
 Whether the gradients of the forward or inverse spline functions are calculated is determined by the `param_eval_function` argument.
@@ -11,30 +11,30 @@ Whether the gradients of the forward or inverse spline functions are calculated 
 # Arguments
 - `param_eval_function`: The function used to evaluate a spline segment. Different functions are used for the forward and inverse spline functions.
 - `x`: An array of real numbers at which the spline functions are evaluated.
-- `w`, `h`, `d`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively.
+- `pY`, `pY`, `dYdX`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively.
 - `tangent_1`, `tangent_2`: Arrays that hold the tangent vectors for the transformed output and the log abs det jacobians respectively.
 
 # Returns
 Three values are returned:
-- `∂y∂w + ∂LogJac∂w`: An array with the same shape as `w`, with the `[:,j,k]`-th element holding the gradient of the `[j,k]`-th element of `y` with respect to the width parameters
+- `∂y∂pX + ∂LogJac∂pX`: An array with the same shape as `pY`, with the `[:,j,k]`-th element holding the gradient of the `[j,k]`-th element of `y` with respect to the width parameters
                       plus the gradient of the logarithm of the absolute value of the derivative of this `[j,k]`-th element of `y` with respect to the `[j,k]`-th element of `x`, with respect to the width parameters. 
-                      For Example, the `[i,j,k]` element of this array is `∂yⱼₖ/∂wᵢⱼₖ + ∂(log(abs(∂yⱼₖ/∂xⱼₖ)))/∂wᵢⱼₖ`.
-- `∂y∂h + ∂LogJac∂h`: An array with the same shape as `h`, holding the same gradients as described above, but with respect to the height parameters.
-- `∂y∂d + ∂LogJac∂d`: An array with the same shape as `d`, holding the same gradients as described above, but with respect to the derivative parameters.
+                      For Example, the `[i,j,k]` element of this array is `∂yⱼₖ/∂pXᵢⱼₖ + ∂(log(abs(∂yⱼₖ/∂xⱼₖ)))/∂pXᵢⱼₖ`.
+- `∂y∂pY + ∂LogJac∂pY`: An array with the same shape as `pY`, holding the same gradients as described above, but with respect to the height parameters.
+- `∂y∂dYdX + ∂LogJac∂dYdX`: An array with the same shape as `dYdX`, holding the same gradients as described above, but with respect to the derivative parameters.
 
 # Note
 Since only one segment of each spline is evaluated for one element of `x`, the returned gradients are filled with zeros, except for the parameters of the segment that is evaluated for that element of `x`.
-For example, if the `[j,k]` -th element of `x` falls in the `l`-th bin of the interval mask, the `[:,j,k]` entries in `∂y∂w + ∂LogJac∂w` are all zero, except the `[l,j,k]` and `[l+1,j,k]` elements, which hold 
-the (generally non-zero) values `∂yⱼₖ/∂wₗⱼₖ + ∂(log(abs(∂yⱼₖ/∂xⱼₖ)))/∂wₗⱼₖ` and `∂yⱼₖ/∂wₗ₊₁ⱼₖ + ∂(log(abs(∂yⱼₖ/∂xⱼₖ)))/∂wₗ₊₁ⱼₖ` respectively.
+For example, if the `[j,k]` -th element of `x` falls in the `l`-th bin of the interval mask, the `[:,j,k]` entries in `∂y∂pX + ∂LogJac∂pX` are all zero, except the `[l,j,k]` and `[l+1,j,k]` elements, which hold 
+the (generally non-zero) values `∂yⱼₖ/∂pXₗⱼₖ + ∂(log(abs(∂yⱼₖ/∂xⱼₖ)))/∂pXₗⱼₖ` and `∂yⱼₖ/∂pXₗ₊₁ⱼₖ + ∂(log(abs(∂yⱼₖ/∂xⱼₖ)))/∂pXₗ₊₁ⱼₖ` respectively.
 
 The function executes in a kernel, on the same backend as `x` is stored (CPU or GPU), and the output is also returned on the same backend.
 """
 function rqs_pullback(
     param_eval_function::Function,
     x::AbstractArray{<:Real},
-    w::AbstractArray{<:Real},
-    h::AbstractArray{<:Real},
-    d::AbstractArray{<:Real},
+    pX::AbstractArray{<:Real},
+    pY::AbstractArray{<:Real},
+    dYdX::AbstractArray{<:Real},
     tangent_1::AbstractArray{<:Real},
     tangent_2::AbstractArray{<:Real};
 ) 
@@ -45,20 +45,20 @@ function rqs_pullback(
     y = similar(x)
     logJac = similar(x)
 
-    ∂y∂w = fill!(similar(w), zero(eltype(w)))
-    ∂y∂d = fill!(similar(h), zero(eltype(h)))
-    ∂y∂h = fill!(similar(d), zero(eltype(d)))
+    ∂y∂pX = fill!(similar(pX), zero(eltype(pX)))
+    ∂y∂dYdX = fill!(similar(pY), zero(eltype(pY)))
+    ∂y∂pY = fill!(similar(dYdX), zero(eltype(dYdX)))
 
-    ∂LogJac∂w = fill!(similar(w), zero(eltype(w)))
-    ∂LogJac∂h = fill!(similar(h), zero(eltype(h)))
-    ∂LogJac∂d = fill!(similar(d), zero(eltype(d)))
+    ∂LogJac∂pX = fill!(similar(pX), zero(eltype(pX)))
+    ∂LogJac∂pY = fill!(similar(pY), zero(eltype(pY)))
+    ∂LogJac∂dYdX = fill!(similar(dYdX), zero(eltype(dYdX)))
 
     kernel!(
         param_eval_function,
         x, y, logJac, 
-        w, h, d,
-        ∂y∂w, ∂y∂h, ∂y∂d,
-        ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d, 
+        pX, pY, dYdX,
+        ∂y∂pX, ∂y∂pY, ∂y∂dYdX,
+        ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX, 
         tangent_1,
         tangent_2,
         ndrange=size(x)
@@ -66,7 +66,7 @@ function rqs_pullback(
 
     logJac = sum(logJac, dims=1)
 
-    return ∂y∂w + ∂LogJac∂w, ∂y∂h + ∂LogJac∂h, ∂y∂d + ∂LogJac∂d
+    return ∂y∂pX + ∂LogJac∂pX, ∂y∂pY + ∂LogJac∂pY, ∂y∂dYdX + ∂LogJac∂dYdX
 end
 
 """
@@ -75,29 +75,29 @@ end
         x::AbstractArray,
         y::AbstractArray,
         logJac::AbstractArray,
-        w::AbstractArray,
-        h::AbstractArray,
-        d::AbstractArray,
-        ∂y∂w_tangent::AbstractArray,
-        ∂y∂h_tangent::AbstractArray,
-        ∂y∂d_tangent::AbstractArray,
-        ∂LogJac∂w_tangent::AbstractArray,
-        ∂LogJac∂h_tangent::AbstractArray,
-        ∂LogJac∂d_tangent::AbstractArray,
+        pXw::AbstractArray,
+        pY::AbstractArray,
+        dYdX::AbstractArray,
+        ∂y∂pX_tangent::AbstractArray,
+        ∂y∂pY_tangent::AbstractArray,
+        ∂y∂dYdX_tangent::AbstractArray,
+        ∂LogJac∂pX_tangent::AbstractArray,
+        ∂LogJac∂pY_tangent::AbstractArray,
+        ∂LogJac∂dYdX_tangent::AbstractArray,
         tangent_1::AbstractArray,
         tangent_2::AbstractArray,
     )
 
-This kernel function calculates the gradients of the rational quadratic spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x` and of `logJac`.
+This kernel function calculates the gradients of the rational quadratic spline functions characterized by `pX`, `pY`, and `dYdX`, evaluated at the values in `x` and of `logJac`.
 
 # Arguments
 - `param_eval_function` The function used to evaluate a spline segment. Different functions are used for the forward and inverse passes.
 - `x`: An array of real numbers to which the spline functions are applied.
-- `w`, `h`, `d`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively.
+- `pX`, `pY`, `dYdX`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively.
 - `y`: An array where the transformed values are stored.
 - `logJac`: An array where the sums of the values of the logarithm of the absolute values of the determinant of the Jacobians of the spline functions applied to a column of `x` are stored.
-- `∂y∂w_tangent`, `∂y∂h_tangent`, `∂y∂d_tangent`: Arrays that will contain the gradients of the spline functions with respect to `w`, `h`, and `d`, respectively.
-- `∂LogJac∂w_tangent`, `∂LogJac∂h_tangent`, `∂LogJac∂d_tangent`: Arrays that will contain the gradients of `logJac` with respect to `w`, `h`, and `d`, respectively.
+- `∂y∂pX_tangent`, `∂y∂pY_tangent`, `∂y∂dYdX_tangent`: Arrays that will contain the gradients of the spline functions with respect to `pX`, `pY`, and `dYdX`, respectively.
+- `∂LogJac∂pX_tangent`, `∂LogJac∂pY_tangent`, `∂LogJac∂dYdX_tangent`: Arrays that will contain the gradients of `logJac` with respect to `pX`, `pY`, and `dYdX`, respectively.
 - `tangent_1`, `tangent_2`: Arrays that hold the tangent vectors for the forward pass.
 
 For an explanation of the shape and contents of the gradient arrays, see the documentation of the [`rqs_pullback()`](@ref) function.
@@ -110,15 +110,15 @@ This function is a kernel function and is used within the `rqs_forward_pullback`
         x::AbstractArray{<:Real},
         y::AbstractArray{<:Real},
         LogJac::AbstractArray{<:Real},
-        w::AbstractArray{<:Real},
-        h::AbstractArray{<:Real},
-        d::AbstractArray{<:Real},
-        ∂y∂w_tangent::AbstractArray{<:Real},
-        ∂y∂h_tangent::AbstractArray{<:Real},
-        ∂y∂d_tangent::AbstractArray{<:Real},
-        ∂LogJac∂w_tangent::AbstractArray{<:Real},
-        ∂LogJac∂h_tangent::AbstractArray{<:Real},
-        ∂LogJac∂d_tangent::AbstractArray{<:Real},
+        pX::AbstractArray{<:Real},
+        pY::AbstractArray{<:Real},
+        dYdX::AbstractArray{<:Real},
+        ∂y∂pX_tangent::AbstractArray{<:Real},
+        ∂y∂pY_tangent::AbstractArray{<:Real},
+        ∂y∂dYdX_tangent::AbstractArray{<:Real},
+        ∂LogJac∂pX_tangent::AbstractArray{<:Real},
+        ∂LogJac∂pY_tangent::AbstractArray{<:Real},
+        ∂LogJac∂dYdX_tangent::AbstractArray{<:Real},
         tangent_1::AbstractArray{<:Real},
         tangent_2::AbstractArray{<:Real},
     )
@@ -126,10 +126,10 @@ This function is a kernel function and is used within the `rqs_forward_pullback`
     i, j = @index(Global, NTuple)
 
     # minus one to account for left pad
-    K = size(w, 1) - 1
+    K = size(pX, 1) - 1
 
     # Find the bin index
-    array_to_search = Base.ifelse(param_eval_function == eval_forward_rqs_params_with_grad, w, h)
+    array_to_search = Base.ifelse(param_eval_function == eval_forward_rqs_params_with_grad, pX, pY)
 
     k1 = searchsortedfirst_impl(view(array_to_search, :, i, j), x[i,j]) - 1
     k2 = one(typeof(k1))
@@ -138,65 +138,65 @@ This function is a kernel function and is used within the `rqs_forward_pullback`
     isinside = (1 <= k1 <= K)
     k = Base.ifelse(isinside, k1, k2)
 
-    x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j]) # Simplifies calculations
+    x_tmp = Base.ifelse(isinside, x[i,j], pX[k,i,j]) # Simplifies calculations
 
-    (yᵢⱼ, LogJacᵢⱼ, ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d) = param_eval_function(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
+    (yᵢⱼ, LogJacᵢⱼ, ∂y∂pX, ∂y∂pY, ∂y∂dYdX, ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX) = param_eval_function(pX[k,i,j], pX[k+1,i,j], pY[k,i,j], pY[k+1,i,j], dYdX[k,i,j], dYdX[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
     LogJac[i,j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
 
-    ∂y∂w_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂w[1], zero(eltype(∂y∂w)))
-    ∂y∂h_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂h[1], zero(eltype(∂y∂h)))
-    ∂y∂d_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂d[1], zero(eltype(∂y∂d)))
-    ∂LogJac∂w_tangent[k, i, j] = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂w[1], zero(eltype(∂LogJac∂w)))
-    ∂LogJac∂h_tangent[k, i, j] = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂h[1], zero(eltype(∂LogJac∂h)))
-    ∂LogJac∂d_tangent[k, i, j] = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂d[1], zero(eltype(∂LogJac∂d)))
+    ∂y∂pX_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂pX[1], zero(eltype(∂y∂pX)))
+    ∂y∂pY_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂pY[1], zero(eltype(∂y∂pY)))
+    ∂y∂dYdX_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂dYdX[1], zero(eltype(∂y∂dYdX)))
+    ∂LogJac∂pX_tangent[k, i, j] = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂pX[1], zero(eltype(∂LogJac∂pX)))
+    ∂LogJac∂pY_tangent[k, i, j] = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂pY[1], zero(eltype(∂LogJac∂pY)))
+    ∂LogJac∂dYdX_tangent[k, i, j] = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂dYdX[1], zero(eltype(∂LogJac∂dYdX)))
 
-    ∂y∂w_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂w[2], zero(eltype(∂y∂w)))
-    ∂y∂h_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂h[2], zero(eltype(∂y∂h)))
-    ∂y∂d_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂d[2], zero(eltype(∂y∂d)))
-    ∂LogJac∂w_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂w[2], zero(eltype(∂LogJac∂w)))
-    ∂LogJac∂h_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂h[2], zero(eltype(∂LogJac∂h)))
-    ∂LogJac∂d_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂d[2], zero(eltype(∂LogJac∂d)))
+    ∂y∂pX_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂pX[2], zero(eltype(∂y∂pX)))
+    ∂y∂pY_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂pY[2], zero(eltype(∂y∂pY)))
+    ∂y∂dYdX_tangent[k+1, i, j]       = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂dYdX[2], zero(eltype(∂y∂dYdX)))
+    ∂LogJac∂pX_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂pX[2], zero(eltype(∂LogJac∂pX)))
+    ∂LogJac∂pY_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂pY[2], zero(eltype(∂LogJac∂pY)))
+    ∂LogJac∂dYdX_tangent[k+1, i, j]  = tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂dYdX[2], zero(eltype(∂LogJac∂dYdX)))
 end
 
 
 """
-    eval_forward_rqs_params_with_grad(wₖ::M0, wₖ₊₁::M0, hₖ::M1, hₖ₊₁::M1, dₖ::M2, dₖ₊₁::M2, x::M3) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
+    eval_forward_rqs_params_with_grad(pXₖ::M0, pXₖ₊₁::M0, pYₖ::M1, pYₖ₊₁::M1, dYdXₖ::M2, dYdXₖ₊₁::M2, x::M3) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
 
 Apply a rational quadratic spline segment to `x`, calculate the logarithm of the absolute value of the derivative ("LogJac") of the segment at `x`, 
 and compute the gradient of that segment and the LogJac with respect to the spline parameters.
 
 # Arguments
-- `wₖ`, `wₖ₊₁`: The width parameters of the spline segment at the edges of the `k`-th interval.
-- `hₖ`, `hₖ₊₁`: The height parameters of the spline segment.
-- `dₖ`, `dₖ₊₁`: The derivative parameters of the spline segment.
+- `pXₖ`, `pXₖ₊₁`: The width parameters of the spline segment at the edges of the `k`-th interval.
+- `pYₖ`, `pYₖ₊₁`: The height parameters of the spline segment.
+- `dYdXₖ`, `dYdXₖ₊₁`: The derivative parameters of the spline segment.
 - `x`: The value at which the spline function is evaluated.
 
 # Returns
 - `y`: The transformed value after applying the rational quadratic spline segment to `x`.
 - `logJac`: The logarithm of the absolute value of the derivative of the segment at `x`.
-- `∂y∂w`, `∂y∂h`, `∂y∂d`: The gradients of `y` with respect to the two width, height, and derivative parameters, respectively.
-- `∂LogJac∂w`, `∂LogJac∂h`, `∂LogJac∂d`: The gradients of `logJac` with respect to the two width, height, and derivative parameters, respectively.
+- `∂y∂pX`, `∂y∂pY`, `∂y∂dYdX`: The gradients of `y` with respect to the two width, height, and derivative parameters, respectively.
+- `∂LogJac∂pX`, `∂LogJac∂pY`, `∂LogJac∂dYdX`: The gradients of `logJac` with respect to the two width, height, and derivative parameters, respectively.
 """
 function eval_forward_rqs_params_with_grad(
-    wₖ::M0, wₖ₊₁::M0, 
-    hₖ::M1, hₖ₊₁::M1, 
-    dₖ::M2, dₖ₊₁::M2, 
+    pXₖ::M0, pXₖ₊₁::M0, 
+    pYₖ::M1, pYₖ₊₁::M1, 
+    dYdXₖ::M2, dYdXₖ₊₁::M2, 
     x::M3) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
 
-    Δy = hₖ₊₁ - hₖ
-    Δx = wₖ₊₁ - wₖ
+    Δy = pYₖ₊₁ - pYₖ
+    Δx = pXₖ₊₁ - pXₖ
     sk = Δy / Δx
-    ξ = (x - wₖ) / Δx
+    ξ = (x - pXₖ) / Δx
 
-    denom = (sk + (dₖ₊₁ + dₖ - 2*sk)*ξ*(1-ξ))
-    nom_1 =  sk*ξ*ξ + dₖ*ξ*(1-ξ)
+    denom = (sk + (dYdXₖ₊₁ + dYdXₖ - 2*sk)*ξ*(1-ξ))
+    nom_1 =  sk*ξ*ξ + dYdXₖ*ξ*(1-ξ)
     nom_2 = Δy * nom_1
-    nom_3 = dₖ₊₁*ξ*ξ + 2*sk*ξ*(1-ξ) + dₖ*(1-ξ)^2
+    nom_3 = dYdXₖ₊₁*ξ*ξ + 2*sk*ξ*(1-ξ) + dYdXₖ*(1-ξ)^2
     nom_4 = sk*sk*nom_3
 
-    y = hₖ + nom_2/denom
+    y = pYₖ + nom_2/denom
 
     # LogJacobian
     logJac = log(abs(nom_4))-2*log(abs(denom))
@@ -204,88 +204,88 @@ function eval_forward_rqs_params_with_grad(
     # Gradient of parameters:
 
     # dy / dw_k
-    ∂s∂wₖ = Δy/Δx^2
-    ∂ξ∂wₖ = (-Δx + x - wₖ)/Δx^2
-    ∂y∂wₖ = (Δy / denom^2) * ((∂s∂wₖ*ξ^2 + 2*sk*ξ*∂ξ∂wₖ + dₖ*(∂ξ∂wₖ -
-                2*ξ*∂ξ∂wₖ))*denom - nom_1*(∂s∂wₖ - 2*∂s∂wₖ*ξ*(1-ξ) + (dₖ₊₁ + dₖ - 2*sk)*(∂ξ∂wₖ - 2*ξ*∂ξ∂wₖ)) )
-    ∂LogJac∂wₖ = (1/nom_4)*(2*sk*∂s∂wₖ*nom_3 + sk*sk*(2*dₖ₊₁*ξ*∂ξ∂wₖ + 2*∂s∂wₖ*ξ*(1-ξ)+2*sk*(∂ξ∂wₖ - 2*ξ*∂ξ∂wₖ)-dₖ*2*(1-ξ)*∂ξ∂wₖ)) - (2/denom)*(∂s∂wₖ - 2*∂s∂wₖ*ξ*(1-ξ) + (dₖ₊₁ + dₖ - 2*sk)*(∂ξ∂wₖ - 2*ξ*∂ξ∂wₖ))
+    ∂s∂pXₖ = Δy/Δx^2
+    ∂ξ∂pXₖ = (-Δx + x - pXₖ)/Δx^2
+    ∂y∂pXₖ = (Δy / denom^2) * ((∂s∂pXₖ*ξ^2 + 2*sk*ξ*∂ξ∂pXₖ + dYdXₖ*(∂ξ∂pXₖ -
+                2*ξ*∂ξ∂pXₖ))*denom - nom_1*(∂s∂pXₖ - 2*∂s∂pXₖ*ξ*(1-ξ) + (dYdXₖ₊₁ + dYdXₖ - 2*sk)*(∂ξ∂pXₖ - 2*ξ*∂ξ∂pXₖ)) )
+    ∂LogJac∂pXₖ = (1/nom_4)*(2*sk*∂s∂pXₖ*nom_3 + sk*sk*(2*dYdXₖ₊₁*ξ*∂ξ∂pXₖ + 2*∂s∂pXₖ*ξ*(1-ξ)+2*sk*(∂ξ∂pXₖ - 2*ξ*∂ξ∂pXₖ)-dYdXₖ*2*(1-ξ)*∂ξ∂pXₖ)) - (2/denom)*(∂s∂pXₖ - 2*∂s∂pXₖ*ξ*(1-ξ) + (dYdXₖ₊₁ + dYdXₖ - 2*sk)*(∂ξ∂pXₖ - 2*ξ*∂ξ∂pXₖ))
 
     # dy / dw_k+1
-    ∂s∂wₖ₊₁ = -Δy/Δx^2
-    ∂ξ∂wₖ₊₁ = -(x - wₖ) / Δx^2
-    ∂y∂wₖ₊₁ = (Δy / denom^2) * ((∂s∂wₖ₊₁*ξ^2 + 2*sk*ξ*∂ξ∂wₖ₊₁ + dₖ*(∂ξ∂wₖ₊₁ -
-                2*ξ*∂ξ∂wₖ₊₁))*denom - nom_1*(∂s∂wₖ₊₁ - 2*∂s∂wₖ₊₁*ξ*(1-ξ) + (dₖ₊₁ + dₖ - 2*sk)*(∂ξ∂wₖ₊₁ - 2*ξ*∂ξ∂wₖ₊₁)) )
-    ∂LogJac∂wₖ₊₁ = (1/nom_4)*(2*sk*∂s∂wₖ₊₁*nom_3 + sk*sk*(2*dₖ₊₁*ξ*∂ξ∂wₖ₊₁ + 2*∂s∂wₖ₊₁*ξ*(1-ξ)+2*sk*(∂ξ∂wₖ₊₁ - 2*ξ*∂ξ∂wₖ₊₁)-dₖ*2*(1-ξ)*∂ξ∂wₖ₊₁)) - (2/denom)*(∂s∂wₖ₊₁ - 2*∂s∂wₖ₊₁*ξ*(1-ξ) + (dₖ₊₁ + dₖ - 2*sk)*(∂ξ∂wₖ₊₁ - 2*ξ*∂ξ∂wₖ₊₁))
+    ∂s∂pXₖ₊₁ = -Δy/Δx^2
+    ∂ξ∂pXₖ₊₁ = -(x - pXₖ) / Δx^2
+    ∂y∂pXₖ₊₁ = (Δy / denom^2) * ((∂s∂pXₖ₊₁*ξ^2 + 2*sk*ξ*∂ξ∂pXₖ₊₁ + dYdXₖ*(∂ξ∂pXₖ₊₁ -
+                2*ξ*∂ξ∂pXₖ₊₁))*denom - nom_1*(∂s∂pXₖ₊₁ - 2*∂s∂pXₖ₊₁*ξ*(1-ξ) + (dYdXₖ₊₁ + dYdXₖ - 2*sk)*(∂ξ∂pXₖ₊₁ - 2*ξ*∂ξ∂pXₖ₊₁)) )
+    ∂LogJac∂pXₖ₊₁ = (1/nom_4)*(2*sk*∂s∂pXₖ₊₁*nom_3 + sk*sk*(2*dYdXₖ₊₁*ξ*∂ξ∂pXₖ₊₁ + 2*∂s∂pXₖ₊₁*ξ*(1-ξ)+2*sk*(∂ξ∂pXₖ₊₁ - 2*ξ*∂ξ∂pXₖ₊₁)-dYdXₖ*2*(1-ξ)*∂ξ∂pXₖ₊₁)) - (2/denom)*(∂s∂pXₖ₊₁ - 2*∂s∂pXₖ₊₁*ξ*(1-ξ) + (dYdXₖ₊₁ + dYdXₖ - 2*sk)*(∂ξ∂pXₖ₊₁ - 2*ξ*∂ξ∂pXₖ₊₁))
 
     # dy / dh_k
-    ∂s∂hₖ = -1/Δx
-    ∂y∂hₖ = 1 + (1/denom^2)*((-nom_1+Δy*ξ*ξ*∂s∂hₖ)*denom - nom_2 * (∂s∂hₖ - 2*∂s∂hₖ*ξ*(1-ξ)) )
-    ∂LogJac∂hₖ = (1/nom_4)*(2*sk*∂s∂hₖ*nom_3 + sk*sk*2*∂s∂hₖ*ξ*(1-ξ)) - (2/denom)*(∂s∂hₖ - 2*∂s∂hₖ*ξ*(1-ξ))
+    ∂s∂pYₖ = -1/Δx
+    ∂y∂pYₖ = 1 + (1/denom^2)*((-nom_1+Δy*ξ*ξ*∂s∂pYₖ)*denom - nom_2 * (∂s∂pYₖ - 2*∂s∂pYₖ*ξ*(1-ξ)) )
+    ∂LogJac∂pYₖ = (1/nom_4)*(2*sk*∂s∂pYₖ*nom_3 + sk*sk*2*∂s∂pYₖ*ξ*(1-ξ)) - (2/denom)*(∂s∂pYₖ - 2*∂s∂pYₖ*ξ*(1-ξ))
 
     # dy / dh_k+1
-    ∂s∂hₖ₊₁ = 1/Δx
-    ∂y∂hₖ₊₁ = (1/denom^2)*((nom_1+Δy*ξ*ξ*∂s∂hₖ₊₁)*denom - nom_2 * (∂s∂hₖ₊₁ - 2*∂s∂hₖ₊₁*ξ*(1-ξ)) )
-    ∂LogJac∂hₖ₊₁ = (1/nom_4)*(2*sk*∂s∂hₖ₊₁*nom_3 + sk*sk*2*∂s∂hₖ₊₁*ξ*(1-ξ)) - (2/denom)*(∂s∂hₖ₊₁ - 2*∂s∂hₖ₊₁*ξ*(1-ξ))
+    ∂s∂pYₖ₊₁ = 1/Δx
+    ∂y∂pYₖ₊₁ = (1/denom^2)*((nom_1+Δy*ξ*ξ*∂s∂pYₖ₊₁)*denom - nom_2 * (∂s∂pYₖ₊₁ - 2*∂s∂pYₖ₊₁*ξ*(1-ξ)) )
+    ∂LogJac∂pYₖ₊₁ = (1/nom_4)*(2*sk*∂s∂pYₖ₊₁*nom_3 + sk*sk*2*∂s∂pYₖ₊₁*ξ*(1-ξ)) - (2/denom)*(∂s∂pYₖ₊₁ - 2*∂s∂pYₖ₊₁*ξ*(1-ξ))
 
     # dy / dd_k
-    ∂y∂dₖ = (1/denom^2) * ((Δy*ξ*(1-ξ))*denom - nom_2*ξ*(1-ξ) )
-    ∂LogJac∂dₖ = (1/nom_4)*sk^2*(1-ξ)^2 - (2/denom)*ξ*(1-ξ)
+    ∂y∂dYdXₖ = (1/denom^2) * ((Δy*ξ*(1-ξ))*denom - nom_2*ξ*(1-ξ) )
+    ∂LogJac∂dYdXₖ = (1/nom_4)*sk^2*(1-ξ)^2 - (2/denom)*ξ*(1-ξ)
 
     # dy / dd_k+1
-    ∂y∂dₖ₊₁ = -(nom_2/denom^2) * ξ*(1-ξ)
-    ∂LogJac∂dₖ₊₁ = (1/nom_4)*sk^2*ξ^2 - (2/denom)*ξ*(1-ξ)
+    ∂y∂dYdXₖ₊₁ = -(nom_2/denom^2) * ξ*(1-ξ)
+    ∂LogJac∂dYdXₖ₊₁ = (1/nom_4)*sk^2*ξ^2 - (2/denom)*ξ*(1-ξ)
 
-    ∂y∂w = (∂y∂wₖ, ∂y∂wₖ₊₁)
-    ∂y∂h = (∂y∂hₖ, ∂y∂hₖ₊₁)
-    ∂y∂d = (∂y∂dₖ, ∂y∂dₖ₊₁)
+    ∂y∂pX = (∂y∂pXₖ, ∂y∂pXₖ₊₁)
+    ∂y∂pY = (∂y∂pYₖ, ∂y∂pYₖ₊₁)
+    ∂y∂dYdX = (∂y∂dYdXₖ, ∂y∂dYdXₖ₊₁)
 
-    ∂LogJac∂w = (∂LogJac∂wₖ, ∂LogJac∂wₖ₊₁)
-    ∂LogJac∂h = (∂LogJac∂hₖ, ∂LogJac∂hₖ₊₁)
-    ∂LogJac∂d = (∂LogJac∂dₖ, ∂LogJac∂dₖ₊₁)
+    ∂LogJac∂pX = (∂LogJac∂pXₖ, ∂LogJac∂pXₖ₊₁)
+    ∂LogJac∂pY = (∂LogJac∂pYₖ, ∂LogJac∂pYₖ₊₁)
+    ∂LogJac∂dYdX = (∂LogJac∂dYdXₖ, ∂LogJac∂dYdXₖ₊₁)
 
-    return y, logJac, ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d
+    return y, logJac, ∂y∂pX, ∂y∂pY, ∂y∂dYdX, ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX
 end
 
 
 """
-    eval_inverse_rqs_params_with_grad(wₖ::M0, wₖ₊₁::M0, 
-                                       hₖ::M1, hₖ₊₁::M1, 
-                                       dₖ::M2, dₖ₊₁::M2, 
+    eval_inverse_rqs_params_with_grad(pXₖ::M0, pXₖ₊₁::M0, 
+                                       pYₖ::M1, pYₖ₊₁::M1, 
+                                       dYdXₖ::M2, dYdXₖ₊₁::M2, 
                                        x::M3            ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
 
 Apply an inverse rational quadratic spline segment to `x`, calculate the logarithm of the absolute value of the derivative ("LogJac") of the segment at `x`, 
 and compute the gradient of that segment and the LogJac with respect to the spline parameters.
 
 # Arguments
-- `wₖ`, `wₖ₊₁`: The width parameters of the spline segment at the edges of the `k`-th interval.
-- `hₖ`, `hₖ₊₁`: The height parameters of the spline segment.
-- `dₖ`, `dₖ₊₁`: The derivative parameters of the spline segment.
+- `pXₖ`, `pXₖ₊₁`: The width parameters of the spline segment at the edges of the `k`-th interval.
+- `pYₖ`, `pYₖ₊₁`: The height parameters of the spline segment.
+- `dYdXₖ`, `dYdXₖ₊₁`: The derivative parameters of the spline segment.
 - `x`: The value at which the spline function is evaluated.
 
 # Returns
 - `y`: The transformed value after applying the inverse rational quadratic spline segment to `x`.
 - `logJac`: The logarithm of the absolute value of the derivative of the segment at `x`.
-- `∂y∂w`, `∂y∂h`, `∂y∂d`: The gradients of `y` with respect to the two width, height, and derivative parameters, respectively.
-- `∂LogJac∂w`, `∂LogJac∂h`, `∂LogJac∂d`: The gradients of `LogJac` with respect to the two width, height, and derivative parameters, respectively.
+- `∂y∂pX`, `∂y∂pY`, `∂y∂dYdX`: The gradients of `y` with respect to the two width, height, and derivative parameters, respectively.
+- `∂LogJac∂pX`, `∂LogJac∂pY`, `∂LogJac∂dYdX`: The gradients of `LogJac` with respect to the two width, height, and derivative parameters, respectively.
 """
 function eval_inverse_rqs_params_with_grad(
-    wₖ::M0, wₖ₊₁::M0, 
-    hₖ::M1, hₖ₊₁::M1, 
-    dₖ::M2, dₖ₊₁::M2, 
+    pXₖ::M0, pXₖ₊₁::M0, 
+    pYₖ::M1, pYₖ₊₁::M1, 
+    dYdXₖ::M2, dYdXₖ₊₁::M2, 
     x::M3) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
 
-    Δy = hₖ₊₁ - hₖ
-    Δy2 = x - hₖ
-    Δx = wₖ₊₁ - wₖ
+    Δy = pYₖ₊₁ - pYₖ
+    Δy2 = x - pYₖ
+    Δx = pXₖ₊₁ - pXₖ
     sk = Δy / Δx
 
-    κ = Δy * (sk - dₖ) + Δy2 * (dₖ₊₁ + dₖ - 2*sk)
-    β = Δy * dₖ - Δy2 * (dₖ₊₁ + dₖ - 2*sk)
+    κ = Δy * (sk - dYdXₖ) + Δy2 * (dYdXₖ₊₁ + dYdXₖ - 2*sk)
+    β = Δy * dYdXₖ - Δy2 * (dYdXₖ₊₁ + dYdXₖ - 2*sk)
     ζ = -sk * Δy2
     θ = sqrt(β*β - 4*κ*ζ)
 
     # Partial derivatives with respect to x
-    ∂κ∂x = dₖ₊₁ + dₖ - 2*sk
+    ∂κ∂x = dYdXₖ₊₁ + dYdXₖ - 2*sk
     ∂β∂x = -∂κ∂x
     ∂ζ∂x = -sk
     ∂θ∂x = (1/θ) * (β * ∂β∂x - 2 * (∂κ∂x * ζ + κ * ∂ζ∂x))
@@ -293,80 +293,80 @@ function eval_inverse_rqs_params_with_grad(
     # Enumerator of -∂y∂x
     μ = 2 * Δx * (∂ζ∂x * (β + θ) - ζ * (∂β∂x + ∂θ∂x))
 
-    # Partial derivatives with regard to wₖ, wₖ₊₁, hₖ, hₖ₊₁, dₖ, dₖ₊₁
-    ∂κ∂wₖ   = (Δy^2 - 2Δy*Δy2) / Δx^2
-    ∂κ∂hₖ   = 2 * Δy2 / Δx - dₖ₊₁
-    ∂κ∂hₖ₊₁ = 2 * (Δy - Δy2) / Δx - dₖ
-    ∂κ∂dₖ   = x - hₖ₊₁
-    ∂κ∂dₖ₊₁ = Δy2
+    # Partial derivatives with regard to pXₖ, pXₖ₊₁, pYₖ, pYₖ₊₁, dYdXₖ, dYdXₖ₊₁
+    ∂κ∂pXₖ   = (Δy^2 - 2Δy*Δy2) / Δx^2
+    ∂κ∂pYₖ   = 2 * Δy2 / Δx - dYdXₖ₊₁
+    ∂κ∂pYₖ₊₁ = 2 * (Δy - Δy2) / Δx - dYdXₖ
+    ∂κ∂dYdXₖ   = x - pYₖ₊₁
+    ∂κ∂dYdXₖ₊₁ = Δy2
     
-    ∂β∂wₖ   = 2 * Δy2 * Δy / Δx^2
-    ∂β∂hₖ   = dₖ₊₁ - 2 * (Δy + Δy2) / Δx
-    ∂β∂hₖ₊₁ = dₖ + 2 * Δy2 / Δx
-    ∂β∂dₖ   = hₖ₊₁ - x
-    ∂β∂dₖ₊₁ = -Δy2
+    ∂β∂pXₖ   = 2 * Δy2 * Δy / Δx^2
+    ∂β∂pYₖ   = dYdXₖ₊₁ - 2 * (Δy + Δy2) / Δx
+    ∂β∂pYₖ₊₁ = dYdXₖ + 2 * Δy2 / Δx
+    ∂β∂dYdXₖ   = pYₖ₊₁ - x
+    ∂β∂dYdXₖ₊₁ = -Δy2
 
-    ∂ζ∂wₖ   = -Δy2 * Δy / Δx^2
-    ∂ζ∂hₖ   = (Δy2 + Δy) / Δx
-    ∂ζ∂hₖ₊₁ = -Δy2 / Δx
+    ∂ζ∂pXₖ   = -Δy2 * Δy / Δx^2
+    ∂ζ∂pYₖ   = (Δy2 + Δy) / Δx
+    ∂ζ∂pYₖ₊₁ = -Δy2 / Δx
 
-    ∂θ∂wₖ   = (1/θ) * (β * ∂β∂wₖ   - 2 * (∂κ∂wₖ   * ζ + κ * ∂ζ∂wₖ  ))
-    ∂θ∂hₖ   = (1/θ) * (β * ∂β∂hₖ   - 2 * (∂κ∂hₖ   * ζ + κ * ∂ζ∂hₖ  ))
-    ∂θ∂hₖ₊₁ = (1/θ) * (β * ∂β∂hₖ₊₁ - 2 * (∂κ∂hₖ₊₁ * ζ + κ * ∂ζ∂hₖ₊₁))
-    ∂θ∂dₖ   = (1/θ) * (β * ∂β∂dₖ   - 2 *  ∂κ∂dₖ   * ζ)
-    ∂θ∂dₖ₊₁ = (1/θ) * (β * ∂β∂dₖ₊₁ - 2 *  ∂κ∂dₖ₊₁ * ζ)
+    ∂θ∂pXₖ   = (1/θ) * (β * ∂β∂pXₖ   - 2 * (∂κ∂pXₖ   * ζ + κ * ∂ζ∂pXₖ  ))
+    ∂θ∂pYₖ   = (1/θ) * (β * ∂β∂pYₖ   - 2 * (∂κ∂pYₖ   * ζ + κ * ∂ζ∂pYₖ  ))
+    ∂θ∂pYₖ₊₁ = (1/θ) * (β * ∂β∂pYₖ₊₁ - 2 * (∂κ∂pYₖ₊₁ * ζ + κ * ∂ζ∂pYₖ₊₁))
+    ∂θ∂dYdXₖ   = (1/θ) * (β * ∂β∂dYdXₖ   - 2 *  ∂κ∂dYdXₖ   * ζ)
+    ∂θ∂dYdXₖ₊₁ = (1/θ) * (β * ∂β∂dYdXₖ₊₁ - 2 *  ∂κ∂dYdXₖ₊₁ * ζ)
 
-    ∂κ∂x∂wₖ   = -2 * Δy / Δx^2
-    ∂κ∂x∂hₖ   =  2 / Δx
-    ∂κ∂x∂hₖ₊₁ = -∂κ∂x∂hₖ
+    ∂κ∂x∂pXₖ   = -2 * Δy / Δx^2
+    ∂κ∂x∂pYₖ   =  2 / Δx
+    ∂κ∂x∂pYₖ₊₁ = -∂κ∂x∂pYₖ
 
-    ∂β∂x∂wₖ   = 2 * Δy / Δx^2
-    ∂β∂x∂hₖ   = -2 / Δx
-    ∂β∂x∂hₖ₊₁ =  -∂β∂x∂hₖ
+    ∂β∂x∂pXₖ   = 2 * Δy / Δx^2
+    ∂β∂x∂pYₖ   = -2 / Δx
+    ∂β∂x∂pYₖ₊₁ =  -∂β∂x∂pYₖ
 
-    ∂ζ∂x∂wₖ   = -Δy / Δx^2
-    ∂ζ∂x∂hₖ   =  1 / Δx
-    ∂ζ∂x∂hₖ₊₁ = -∂ζ∂x∂hₖ
+    ∂ζ∂x∂pXₖ   = -Δy / Δx^2
+    ∂ζ∂x∂pYₖ   =  1 / Δx
+    ∂ζ∂x∂pYₖ₊₁ = -∂ζ∂x∂pYₖ
 
-    ∂θ∂x∂wₖ   = (1 / θ) * (((∂β∂wₖ   * ∂β∂x + β * ∂β∂x∂wₖ  ) - 2 * (∂κ∂x∂wₖ   * ζ + ∂κ∂x * ∂ζ∂wₖ   + ∂κ∂wₖ   * ∂ζ∂x + κ * ∂ζ∂x∂wₖ  )) - ∂θ∂wₖ   * ∂θ∂x)
-    ∂θ∂x∂hₖ   = (1 / θ) * (((∂β∂hₖ   * ∂β∂x + β * ∂β∂x∂hₖ  ) - 2 * (∂κ∂x∂hₖ   * ζ + ∂κ∂x * ∂ζ∂hₖ   + ∂κ∂hₖ   * ∂ζ∂x + κ * ∂ζ∂x∂hₖ  )) - ∂θ∂hₖ   * ∂θ∂x)
-    ∂θ∂x∂hₖ₊₁ = (1 / θ) * (((∂β∂hₖ₊₁ * ∂β∂x + β * ∂β∂x∂hₖ₊₁) - 2 * (∂κ∂x∂hₖ₊₁ * ζ + ∂κ∂x * ∂ζ∂hₖ₊₁ + ∂κ∂hₖ₊₁ * ∂ζ∂x + κ * ∂ζ∂x∂hₖ₊₁)) - ∂θ∂hₖ₊₁ * ∂θ∂x)
-    ∂θ∂x∂dₖ   = (1 / θ) * (((∂β∂dₖ   * ∂β∂x - β) - 2 * (ζ + ∂κ∂dₖ   * ∂ζ∂x)) - ∂θ∂dₖ   * ∂θ∂x)
-    ∂θ∂x∂dₖ₊₁ = (1 / θ) * (((∂β∂dₖ₊₁ * ∂β∂x - β) - 2 * (ζ + ∂κ∂dₖ₊₁ * ∂ζ∂x)) - ∂θ∂dₖ₊₁ * ∂θ∂x)
+    ∂θ∂x∂pXₖ   = (1 / θ) * (((∂β∂pXₖ   * ∂β∂x + β * ∂β∂x∂pXₖ  ) - 2 * (∂κ∂x∂pXₖ   * ζ + ∂κ∂x * ∂ζ∂pXₖ   + ∂κ∂pXₖ   * ∂ζ∂x + κ * ∂ζ∂x∂pXₖ  )) - ∂θ∂pXₖ   * ∂θ∂x)
+    ∂θ∂x∂pYₖ   = (1 / θ) * (((∂β∂pYₖ   * ∂β∂x + β * ∂β∂x∂pYₖ  ) - 2 * (∂κ∂x∂pYₖ   * ζ + ∂κ∂x * ∂ζ∂pYₖ   + ∂κ∂pYₖ   * ∂ζ∂x + κ * ∂ζ∂x∂pYₖ  )) - ∂θ∂pYₖ   * ∂θ∂x)
+    ∂θ∂x∂pYₖ₊₁ = (1 / θ) * (((∂β∂pYₖ₊₁ * ∂β∂x + β * ∂β∂x∂pYₖ₊₁) - 2 * (∂κ∂x∂pYₖ₊₁ * ζ + ∂κ∂x * ∂ζ∂pYₖ₊₁ + ∂κ∂pYₖ₊₁ * ∂ζ∂x + κ * ∂ζ∂x∂pYₖ₊₁)) - ∂θ∂pYₖ₊₁ * ∂θ∂x)
+    ∂θ∂x∂dYdXₖ   = (1 / θ) * (((∂β∂dYdXₖ   * ∂β∂x - β) - 2 * (ζ + ∂κ∂dYdXₖ   * ∂ζ∂x)) - ∂θ∂dYdXₖ   * ∂θ∂x)
+    ∂θ∂x∂dYdXₖ₊₁ = (1 / θ) * (((∂β∂dYdXₖ₊₁ * ∂β∂x - β) - 2 * (ζ + ∂κ∂dYdXₖ₊₁ * ∂ζ∂x)) - ∂θ∂dYdXₖ₊₁ * ∂θ∂x)
 
-    ∂μ∂wₖ   = 2 * (Δx * (∂ζ∂x∂wₖ   * (β + θ) + ∂ζ∂x * (∂β∂wₖ   + ∂θ∂wₖ)   - ∂ζ∂wₖ   * (∂β∂x + ∂θ∂x) - ζ * (∂β∂x∂wₖ   + ∂θ∂x∂wₖ)) - μ / (2*Δx))
-    ∂μ∂hₖ   = 2 * (Δx * (∂ζ∂x∂hₖ   * (β + θ) + ∂ζ∂x * (∂β∂hₖ   + ∂θ∂hₖ)   - ∂ζ∂hₖ   * (∂β∂x + ∂θ∂x) - ζ * (∂β∂x∂hₖ   + ∂θ∂x∂hₖ)))
-    ∂μ∂hₖ₊₁ = 2 * (Δx * (∂ζ∂x∂hₖ₊₁ * (β + θ) + ∂ζ∂x * (∂β∂hₖ₊₁ + ∂θ∂hₖ₊₁) - ∂ζ∂hₖ₊₁ * (∂β∂x + ∂θ∂x) - ζ * (∂β∂x∂hₖ₊₁ + ∂θ∂x∂hₖ₊₁)))
-    ∂μ∂dₖ   = 2 * (Δx * (∂ζ∂x * (∂β∂dₖ   + ∂θ∂dₖ)   - ζ * (∂θ∂x∂dₖ   - 1)))
-    ∂μ∂dₖ₊₁ = 2 * (Δx * (∂ζ∂x * (∂β∂dₖ₊₁ + ∂θ∂dₖ₊₁) - ζ * (∂θ∂x∂dₖ₊₁ - 1)))
+    ∂μ∂pXₖ   = 2 * (Δx * (∂ζ∂x∂pXₖ   * (β + θ) + ∂ζ∂x * (∂β∂pXₖ   + ∂θ∂pXₖ)   - ∂ζ∂pXₖ   * (∂β∂x + ∂θ∂x) - ζ * (∂β∂x∂pXₖ   + ∂θ∂x∂pXₖ)) - μ / (2*Δx))
+    ∂μ∂pYₖ   = 2 * (Δx * (∂ζ∂x∂pYₖ   * (β + θ) + ∂ζ∂x * (∂β∂pYₖ   + ∂θ∂pYₖ)   - ∂ζ∂pYₖ   * (∂β∂x + ∂θ∂x) - ζ * (∂β∂x∂pYₖ   + ∂θ∂x∂pYₖ)))
+    ∂μ∂pYₖ₊₁ = 2 * (Δx * (∂ζ∂x∂pYₖ₊₁ * (β + θ) + ∂ζ∂x * (∂β∂pYₖ₊₁ + ∂θ∂pYₖ₊₁) - ∂ζ∂pYₖ₊₁ * (∂β∂x + ∂θ∂x) - ζ * (∂β∂x∂pYₖ₊₁ + ∂θ∂x∂pYₖ₊₁)))
+    ∂μ∂dYdXₖ   = 2 * (Δx * (∂ζ∂x * (∂β∂dYdXₖ   + ∂θ∂dYdXₖ)   - ζ * (∂θ∂x∂dYdXₖ   - 1)))
+    ∂μ∂dYdXₖ₊₁ = 2 * (Δx * (∂ζ∂x * (∂β∂dYdXₖ₊₁ + ∂θ∂dYdXₖ₊₁) - ζ * (∂θ∂x∂dYdXₖ₊₁ - 1)))
 
-    ∂y∂wₖ   = 2 * (Δx * ((ζ * (∂β∂wₖ   + ∂θ∂wₖ  )) / (β + θ)^2 - ∂ζ∂wₖ   / (β + θ)) + ζ/(β + θ)) + 1
-    ∂y∂wₖ₊₁ = -∂y∂wₖ + 1
-    ∂y∂hₖ   = 2 * (Δx * ((ζ * (∂β∂hₖ   + ∂θ∂hₖ  )) / (β + θ)^2 - ∂ζ∂hₖ   / (β + θ)))
-    ∂y∂hₖ₊₁ = 2 * (Δx * ((ζ * (∂β∂hₖ₊₁ + ∂θ∂hₖ₊₁)) / (β + θ)^2 - ∂ζ∂hₖ₊₁ / (β + θ)))
-    ∂y∂dₖ   = 2 *  Δx *  (ζ * (∂β∂dₖ   + ∂θ∂dₖ  )) / (β + θ)^2 
-    ∂y∂dₖ₊₁ = 2 *  Δx *  (ζ * (∂β∂dₖ₊₁ + ∂θ∂dₖ₊₁)) / (β + θ)^2 
+    ∂y∂pXₖ   = 2 * (Δx * ((ζ * (∂β∂pXₖ   + ∂θ∂pXₖ  )) / (β + θ)^2 - ∂ζ∂pXₖ   / (β + θ)) + ζ/(β + θ)) + 1
+    ∂y∂pXₖ₊₁ = -∂y∂pXₖ + 1
+    ∂y∂pYₖ   = 2 * (Δx * ((ζ * (∂β∂pYₖ   + ∂θ∂pYₖ  )) / (β + θ)^2 - ∂ζ∂pYₖ   / (β + θ)))
+    ∂y∂pYₖ₊₁ = 2 * (Δx * ((ζ * (∂β∂pYₖ₊₁ + ∂θ∂pYₖ₊₁)) / (β + θ)^2 - ∂ζ∂pYₖ₊₁ / (β + θ)))
+    ∂y∂dYdXₖ   = 2 *  Δx *  (ζ * (∂β∂dYdXₖ   + ∂θ∂dYdXₖ  )) / (β + θ)^2 
+    ∂y∂dYdXₖ₊₁ = 2 *  Δx *  (ζ * (∂β∂dYdXₖ₊₁ + ∂θ∂dYdXₖ₊₁)) / (β + θ)^2 
 
-    ∂LogJac∂wₖ   = (1 / μ) * ∂μ∂wₖ   - (2 / (β + θ)) * (∂β∂wₖ   + ∂θ∂wₖ)
-    ∂LogJac∂wₖ₊₁ = -∂LogJac∂wₖ
-    ∂LogJac∂hₖ   = (1 / μ) * ∂μ∂hₖ   - (2 / (β + θ)) * (∂β∂hₖ   + ∂θ∂hₖ)
-    ∂LogJac∂hₖ₊₁ = (1 / μ) * ∂μ∂hₖ₊₁ - (2 / (β + θ)) * (∂β∂hₖ₊₁ + ∂θ∂hₖ₊₁)
-    ∂LogJac∂dₖ   = (1 / μ) * ∂μ∂dₖ   - (2 / (β + θ)) * (∂β∂dₖ   + ∂θ∂dₖ)
-    ∂LogJac∂dₖ₊₁ = (1 / μ) * ∂μ∂dₖ₊₁ - (2 / (β + θ)) * (∂β∂dₖ₊₁ + ∂θ∂dₖ₊₁)
+    ∂LogJac∂pXₖ   = (1 / μ) * ∂μ∂pXₖ   - (2 / (β + θ)) * (∂β∂pXₖ   + ∂θ∂pXₖ)
+    ∂LogJac∂pXₖ₊₁ = -∂LogJac∂pXₖ
+    ∂LogJac∂pYₖ   = (1 / μ) * ∂μ∂pYₖ   - (2 / (β + θ)) * (∂β∂pYₖ   + ∂θ∂pYₖ)
+    ∂LogJac∂pYₖ₊₁ = (1 / μ) * ∂μ∂pYₖ₊₁ - (2 / (β + θ)) * (∂β∂pYₖ₊₁ + ∂θ∂pYₖ₊₁)
+    ∂LogJac∂dYdXₖ   = (1 / μ) * ∂μ∂dYdXₖ   - (2 / (β + θ)) * (∂β∂dYdXₖ   + ∂θ∂dYdXₖ)
+    ∂LogJac∂dYdXₖ₊₁ = (1 / μ) * ∂μ∂dYdXₖ₊₁ - (2 / (β + θ)) * (∂β∂dYdXₖ₊₁ + ∂θ∂dYdXₖ₊₁)
 
     # Transformed output
-    y =  wₖ - 2 * (ζ / (β + θ)) * Δx
+    y =  pXₖ - 2 * (ζ / (β + θ)) * Δx
 
     # LogJacobian, logaritm of the absolute value of ∂y/∂x
     LogJac = log(abs(μ)) - 2*log(abs(β + θ))
 
-    ∂y∂w = (∂y∂wₖ, ∂y∂wₖ₊₁)
-    ∂y∂h = (∂y∂hₖ, ∂y∂hₖ₊₁)
-    ∂y∂d = (∂y∂dₖ, ∂y∂dₖ₊₁)
+    ∂y∂pX = (∂y∂pXₖ, ∂y∂pXₖ₊₁)
+    ∂y∂pY = (∂y∂pYₖ, ∂y∂pYₖ₊₁)
+    ∂y∂dYdX = (∂y∂dYdXₖ, ∂y∂dYdXₖ₊₁)
 
-    ∂LogJac∂w = (∂LogJac∂wₖ, ∂LogJac∂wₖ₊₁)
-    ∂LogJac∂h = (∂LogJac∂hₖ, ∂LogJac∂hₖ₊₁)
-    ∂LogJac∂d = (∂LogJac∂dₖ, ∂LogJac∂dₖ₊₁)
+    ∂LogJac∂pX = (∂LogJac∂pXₖ, ∂LogJac∂pXₖ₊₁)
+    ∂LogJac∂pY = (∂LogJac∂pYₖ, ∂LogJac∂pYₖ₊₁)
+    ∂LogJac∂dYdX = (∂LogJac∂dYdXₖ, ∂LogJac∂dYdXₖ₊₁)
 
-    return y, LogJac, ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d
+    return y, LogJac, ∂y∂pX, ∂y∂pY, ∂y∂dYdX, ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX
 end

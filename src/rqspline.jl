@@ -113,11 +113,11 @@ end
 
 
 """
-    MonotonicSplines.rqs_forward(x::Real, w::AbstractVector{<:Real}, h::AbstractVector{<:Real}, d::AbstractVector{<:Real})
-    MonotonicSplines.rqs_forward(X::AbstractArray{<:Real,2}, w::AbstractArray{<:Real,3}, h::AbstractArray{<:Real,3}, d::AbstractArray{<:Real,3})
+    MonotonicSplines.rqs_forward(x::Real, pX::AbstractVector{<:Real}, pY::AbstractVector{<:Real}, dYdX::AbstractVector{<:Real})
+    MonotonicSplines.rqs_forward(X::AbstractArray{<:Real,2}, pX::AbstractArray{<:Real,3}, pY::AbstractArray{<:Real,3}, dYdX::AbstractArray{<:Real,3})
 
-Apply the rational quadratic spline function(s) defined by the parameters `w`
-(pX), `h` (pY), and `d` (dYdX), to the input(s) `X`.
+Apply the rational quadratic spline function(s) defined by the parameters `pX`
+(pX), `pY` (pY), and `dYdX` (dYdX), to the input(s) `X`.
 
 See [`RQSpline`](@ref) for more details.
 """
@@ -126,22 +126,22 @@ function rqs_forward end
 
 function rqs_forward(
     x::Real,
-    w::AbstractVector{<:Real},
-    h::AbstractVector{<:Real},
-    d::AbstractVector{<:Real}
+    pX::AbstractVector{<:Real},
+    pY::AbstractVector{<:Real},
+    dYdX::AbstractVector{<:Real}
 )
-    K = size(w, 1) - 1
+    K = size(pX, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(view(w, :), x) - 1
+    k1 = searchsortedfirst_impl(view(pX, :), x) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
     isinside = (1 <= k1 <= K)
     k = Base.ifelse(isinside, k1, k2)
 
-    x_tmp = Base.ifelse(isinside, x, w[k]) # Simplifies calculations
-    (y_tmp, logJac_tmp) = eval_forward_rqs_params(w[k], w[k+1], h[k], h[k+1], d[k], d[k+1], x_tmp)
+    x_tmp = Base.ifelse(isinside, x, pX[k]) # Simplifies calculations
+    (y_tmp, logJac_tmp) = eval_forward_rqs_params(pX[k], pX[k+1], pY[k], pY[k+1], dYdX[k], dYdX[k+1], x_tmp)
 
     y = Base.ifelse(isinside, y_tmp, x) 
     logJac = Base.ifelse(isinside, logJac_tmp, zero(typeof(logJac_tmp)))
@@ -152,9 +152,9 @@ end
 
 function rqs_forward(
     x::AbstractArray{<:Real,2},
-    w::AbstractArray{<:Real,3},
-    h::AbstractArray{<:Real,3},
-    d::AbstractArray{<:Real,3}
+    pX::AbstractArray{<:Real,3},
+    pY::AbstractArray{<:Real,3},
+    dYdX::AbstractArray{<:Real,3}
 )
     compute_unit = get_compute_unit(x)
     backend = ka_backend(compute_unit)
@@ -163,7 +163,7 @@ function rqs_forward(
     y = similar(x)
     logJac = similar(x)
 
-    kernel!(x, y, logJac, w, h, d, ndrange=size(x))
+    kernel!(x, y, logJac, pX, pY, dYdX, ndrange=size(x))
 
     logJac = sum(logJac, dims=1)
 
@@ -175,25 +175,25 @@ end
     x::AbstractArray{<:Real},
     y::AbstractArray{<:Real},
     logJac::AbstractArray{<:Real},
-    w::AbstractArray{<:Real},
-    h::AbstractArray{<:Real},
-    d::AbstractArray{<:Real}
+    pX::AbstractArray{<:Real},
+    pY::AbstractArray{<:Real},
+    dYdX::AbstractArray{<:Real}
 )
 
     i, j = @index(Global, NTuple)
 
-    K = size(w, 1) - 1
+    K = size(pX, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(view(w, :, i, j), x[i,j]) - 1
+    k1 = searchsortedfirst_impl(view(pX, :, i, j), x[i,j]) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
     isinside = (1 <= k1 <= K)
     k = Base.ifelse(isinside, k1, k2)
 
-    x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j]) # Simplifies calculations
-    (yᵢⱼ, LogJacᵢⱼ) = eval_forward_rqs_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
+    x_tmp = Base.ifelse(isinside, x[i,j], pX[k,i,j]) # Simplifies calculations
+    (yᵢⱼ, LogJacᵢⱼ) = eval_forward_rqs_params(pX[k,i,j], pX[k+1,i,j], pY[k,i,j], pY[k+1,i,j], dYdX[k,i,j], dYdX[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
     logJac[i, j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
@@ -201,14 +201,14 @@ end
 
 
 """
-    MonotonicSplines.eval_forward_rqs_params(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
+    MonotonicSplines.eval_forward_rqs_params(pXₖ::Real, pXₖ₊₁::Real, pYₖ::Real, pYₖ₊₁::Real, dYdXₖ::Real, dYdXₖ₊₁::Real, x::Real)
 
 Apply a rational quadratic spline segment to a number `x`, and calculate the logarithm of the absolute value of this function's Jacobian.
 
 # Arguments
-- `wₖ`, `wₖ₊₁`: The width parameters of the spline segment at the edges of the `k`-th interval.
-- `hₖ`, `hₖ₊₁`: The height parameters of the spline segment.
-- `dₖ`, `dₖ₊₁`: The derivative parameters of the spline segment.
+- `pXₖ`, `pXₖ₊₁`: The width parameters of the spline segment at the edges of the `k`-th interval.
+- `pYₖ`, `pYₖ₊₁`: The height parameters of the spline segment.
+- `dYdXₖ`, `dYdXₖ₊₁`: The derivative parameters of the spline segment.
 - `x`: The value at which the spline function is evaluated.
 
 # Returns
@@ -216,23 +216,23 @@ Apply a rational quadratic spline segment to a number `x`, and calculate the log
 - `logJac`: The logarithm of the absolute value of the derivative of the segment at `x`.
 """
 function eval_forward_rqs_params(
-    wₖ::Real, wₖ₊₁::Real, 
-    hₖ::Real, hₖ₊₁::Real, 
-    dₖ::Real, dₖ₊₁::Real, 
+    pXₖ::Real, pXₖ₊₁::Real, 
+    pYₖ::Real, pYₖ₊₁::Real, 
+    dYdXₖ::Real, dYdXₖ₊₁::Real, 
     x::Real) 
       
-    Δy = hₖ₊₁ - hₖ
-    Δx = wₖ₊₁ - wₖ
+    Δy = pYₖ₊₁ - pYₖ
+    Δx = pXₖ₊₁ - pXₖ
     sk = Δy / Δx
-    ξ = (x - wₖ) / Δx
+    ξ = (x - pXₖ) / Δx
 
-    denom = (sk + (dₖ₊₁ + dₖ - 2*sk)*ξ*(1-ξ))
-    nom_1 =  sk*ξ*ξ + dₖ*ξ*(1-ξ)
+    denom = (sk + (dYdXₖ₊₁ + dYdXₖ - 2*sk)*ξ*(1-ξ))
+    nom_1 =  sk*ξ*ξ + dYdXₖ*ξ*(1-ξ)
     nom_2 = Δy * nom_1
-    nom_3 = dₖ₊₁*ξ*ξ + 2*sk*ξ*(1-ξ) + dₖ*(1-ξ)^2
+    nom_3 = dYdXₖ₊₁*ξ*ξ + 2*sk*ξ*(1-ξ) + dYdXₖ*(1-ξ)^2
     nom_4 = sk*sk*nom_3
 
-    y = hₖ + nom_2/denom
+    y = pYₖ + nom_2/denom
 
     # LogJacobian
     logJac = log(abs(nom_4))-2*log(abs(denom))
@@ -242,11 +242,11 @@ end
 
 
 """
-    MonotonicSplines.rqs_inverse(x::Real, w::AbstractVector{<:Real}, h::AbstractVector{<:Real}, d::AbstractVector{<:Real})
-    MonotonicSplines.rqs_inverse(X::AbstractArray{<:Real,2}, w::AbstractArray{<:Real,3}, h::AbstractArray{<:Real,3}, d::AbstractArray{<:Real,3})
+    MonotonicSplines.rqs_inverse(x::Real, pX::AbstractVector{<:Real}, pY::AbstractVector{<:Real}, dYdX::AbstractVector{<:Real})
+    MonotonicSplines.rqs_inverse(X::AbstractArray{<:Real,2}, pX::AbstractArray{<:Real,3}, pY::AbstractArray{<:Real,3}, dYdX::AbstractArray{<:Real,3})
 
 Apply the inverse of the rational quadratic spline function(s) defined by the
-parameters `w` (pX), `h` (pY), and `d` (dYdX), to the input(s)
+parameters `pX` (pX), `pY` (pY), and `dYdX` (dYdX), to the input(s)
 `X`.
 
 See [`InvRQSpline`](@ref) for more details.
@@ -255,22 +255,22 @@ function rqs_inverse end
 
 function rqs_inverse(
     x::Real,
-    w::AbstractVector{<:Real},
-    h::AbstractVector{<:Real},
-    d::AbstractVector{<:Real}
+    pX::AbstractVector{<:Real},
+    pY::AbstractVector{<:Real},
+    dYdX::AbstractVector{<:Real}
 )
-    K = size(w, 1) - 1
+    K = size(pX, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(view(h, :), x) - 1
+    k1 = searchsortedfirst_impl(view(pY, :), x) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
     isinside = (k1 < K) && (k1 > 0)
     k = Base.ifelse(isinside, k1, k2)
 
-    x_tmp = Base.ifelse(isinside, x, w[k])  # Simplifies unnecessary calculations
-    (y_tmp, logJac_tmp) = eval_inverse_rqs_params(w[k], w[k+1], h[k], h[k+1], d[k], d[k+1], x_tmp)
+    x_tmp = Base.ifelse(isinside, x, pX[k])  # Simplifies unnecessary calculations
+    (y_tmp, logJac_tmp) = eval_inverse_rqs_params(pX[k], pX[k+1], pY[k], pY[k+1], dYdX[k], dYdX[k+1], x_tmp)
 
     y = Base.ifelse(isinside, y_tmp, x) 
     logJac = Base.ifelse(isinside, logJac_tmp, zero(typeof(logJac_tmp)))
@@ -280,9 +280,9 @@ end
 
 function rqs_inverse(
         x::AbstractArray{<:Real,2},
-        w::AbstractArray{<:Real,3},
-        h::AbstractArray{<:Real,3},
-        d::AbstractArray{<:Real,3}
+        pX::AbstractArray{<:Real,3},
+        pY::AbstractArray{<:Real,3},
+        dYdX::AbstractArray{<:Real,3}
     )
 
     compute_unit = get_compute_unit(x)
@@ -291,7 +291,7 @@ function rqs_inverse(
 
     y = similar(x)
     logJac = similar(x) 
-    kernel!(x, y, logJac, w, h, d, ndrange=size(x))
+    kernel!(x, y, logJac, pX, pY, dYdX, ndrange=size(x))
     logJac = sum(logJac, dims=1)
 
     return y, logJac
@@ -302,25 +302,24 @@ end
         x::AbstractArray{<:Real},
         y::AbstractArray{<:Real},
         logJac::AbstractArray{<:Real},
-        w::AbstractArray{<:Real},
-        h::AbstractArray{<:Real},
-        d::AbstractArray{<:Real}
-    ) 
-
+        pX::AbstractArray{<:Real},
+        pY::AbstractArray{<:Real},
+        dYdX::AbstractArray{<:Real}
+    )
     i, j = @index(Global, NTuple)
     
-    K = size(w, 1) - 1
+    K = size(pX, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(view(h, :, i, j), x[i,j]) - 1
+    k1 = searchsortedfirst_impl(view(pY, :, i, j), x[i,j]) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
     isinside = (k1 < K) && (k1 > 0)
     k = Base.ifelse(isinside, k1, k2)
 
-    x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j])  # Simplifies unnecessary calculations
-    (yᵢⱼ, LogJacᵢⱼ) = eval_inverse_rqs_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
+    x_tmp = Base.ifelse(isinside, x[i,j], pX[k,i,j])  # Simplifies unnecessary calculations
+    (yᵢⱼ, LogJacᵢⱼ) = eval_inverse_rqs_params(pX[k,i,j], pX[k+1,i,j], pY[k,i,j], pY[k+1,i,j], dYdX[k,i,j], dYdX[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
     logJac[i, j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
@@ -328,14 +327,14 @@ end
 
 
 """
-    MonotonicSplines.eval_inverse_rqs_params(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
+    MonotonicSplines.eval_inverse_rqs_params(pXₖ::Real, pXₖ₊₁::Real, pYₖ::Real, pYₖ₊₁::Real, dYdXₖ::Real, dYdXₖ₊₁::Real, x::Real)
 
 Apply a rational quadratic spline segment to a number `x`, and calculate the logarithm of the absolute value of this function's derivative.
 
 # Arguments
-- `wₖ`, `wₖ₊₁`: The width parameters of the spline segment at the edges of the `k`-th interval.
-- `hₖ`, `hₖ₊₁`: The height parameters of the spline segment.
-- `dₖ`, `dₖ₊₁`: The derivative parameters of the spline segment.
+- `pXₖ`, `pXₖ₊₁`: The width parameters of the spline segment at the edges of the `k`-th interval.
+- `pYₖ`, `pYₖ₊₁`: The height parameters of the spline segment.
+- `dYdXₖ`, `dYdXₖ₊₁`: The derivative parameters of the spline segment.
 - `x`: The value at which the spline function is evaluated.
 
 # Returns
@@ -343,27 +342,27 @@ Apply a rational quadratic spline segment to a number `x`, and calculate the log
 - `logJac`: The logarithm of the absolute value of the derivative of the segment at `x`.
 """
 function eval_inverse_rqs_params(
-    wₖ::M0, wₖ₊₁::M0, 
-    hₖ::M1, hₖ₊₁::M1, 
-    dₖ::M2, dₖ₊₁::M2, 
+    pXₖ::M0, pXₖ₊₁::M0, 
+    pYₖ::M1, pYₖ₊₁::M1, 
+    dYdXₖ::M2, dYdXₖ₊₁::M2, 
     x::M3) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
 
-    Δy = hₖ₊₁ - hₖ
-    Δy2 = x - hₖ # use y instead of X, because of inverse
-    Δx = wₖ₊₁ - wₖ
+    Δy = pYₖ₊₁ - pYₖ
+    Δy2 = x - pYₖ # use y instead of X, because of inverse
+    Δx = pXₖ₊₁ - pXₖ
     sk = Δy / Δx
 
-    a = Δy * (sk - dₖ) + Δy2 * (dₖ₊₁ + dₖ - 2*sk)
-    b = Δy * dₖ - Δy2 * (dₖ₊₁ + dₖ - 2*sk)
+    a = Δy * (sk - dYdXₖ) + Δy2 * (dYdXₖ₊₁ + dYdXₖ - 2*sk)
+    b = Δy * dYdXₖ - Δy2 * (dYdXₖ₊₁ + dYdXₖ - 2*sk)
     c = - sk * Δy2
 
     denom = -b - sqrt(b*b - 4*a*c)
 
-    y = (2 * c / denom) * Δx + wₖ
+    y = (2 * c / denom) * Δx + pXₖ
 
     # Gradient computation:
-    da =  (dₖ₊₁ + dₖ - 2*sk)
-    db = -(dₖ₊₁ + dₖ - 2*sk)
+    da =  (dYdXₖ₊₁ + dYdXₖ - 2*sk)
+    db = -(dYdXₖ₊₁ + dYdXₖ - 2*sk)
     dc = - sk
 
     temp2 = 1 / (2*sqrt(b*b - 4*a*c))

@@ -8,10 +8,10 @@ Process the raw output parameters of a neural network to generate parameters for
 # Arguments
 - `θ_raw`: A matrix where each column represents the raw parameters for a sample.
 - `n_dims_trafo`: The number of spline functions for which parameters are to be produced.
-- `B`: A real number used to initialize the pX and pY of the spline functions. Default is 5.
+- `B`: Sets the rage of the splines.
 
 # Returns
-- A tuple `w, h, d` containing the positions of and derivatives at the spline knots.
+- A tuple `pX, pY, dYdX` containing the positions of and derivatives at the spline knots.
   The parameters are stored in a `K+1 x n_spline_functions_per_sample x n_samples` array.
 """
 function get_params(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
@@ -21,11 +21,11 @@ function get_params(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
 
     compute_unit = get_compute_unit(θ_raw)
 
-    w =  cat(adapt(compute_unit, repeat([-B], 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[1:K,:,:])); dims = 1)
-    h =  cat(adapt(compute_unit, repeat([-B], 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[K+1:2K,:,:])); dims = 1)
-    d =  cat(adapt(compute_unit, repeat([1], 1, n_dims_trafo, N)), _softplus_tri(θ[2K+1:end,:,:]), adapt(compute_unit, repeat([1], 1, n_dims_trafo, N)); dims = 1)
+    pX =  cat(adapt(compute_unit, repeat([-B], 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[1:K,:,:])); dims = 1)
+    pY =  cat(adapt(compute_unit, repeat([-B], 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[K+1:2K,:,:])); dims = 1)
+    dYdX =  cat(adapt(compute_unit, repeat([1], 1, n_dims_trafo, N)), _softplus_tri(θ[2K+1:end,:,:]), adapt(compute_unit, repeat([1], 1, n_dims_trafo, N)); dims = 1)
 
-    return w, h, d
+    return pX, pY, dYdX
 end
 
 export get_params
