@@ -12,9 +12,6 @@ using Adapt: adapt
 
 using LinearAlgebra
 
-import ChainRulesCore
-using ChainRulesCore: rrule, @thunk, NoTangent
-
 import ChangesOfVariables
 
 using HeterogeneousComputing

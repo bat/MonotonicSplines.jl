@@ -163,22 +163,6 @@ This function is a kernel function and is used within the `rqs_forward_pullback`
 end
 
 
-function ChainRulesCore.rrule(
-    ::typeof(rqs_forward),
-    x::AbstractArray{<:Real},
-    w::AbstractArray{<:Real},
-    h::AbstractArray{<:Real},
-    d::AbstractArray{<:Real}
-)
-
-    y, logJac = rqs_forward(x, w, h, d)
-    compute_unit = get_compute_unit(x)
-
-    pullback(tangent) = (NoTangent(), @thunk(tangent[1] .* exp.(logJac)), rqs_pullback(eval_forward_rqs_params_with_grad, x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...)
-
-    return (y, logJac), pullback
-end
-
 """
     eval_forward_rqs_params_with_grad(wₖ::M0, wₖ₊₁::M0, hₖ::M1, hₖ₊₁::M1, dₖ::M2, dₖ₊₁::M2, x::M3) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
 
@@ -264,22 +248,6 @@ function eval_forward_rqs_params_with_grad(
     return y, logJac, ∂y∂w, ∂y∂h, ∂y∂d, ∂LogJac∂w, ∂LogJac∂h, ∂LogJac∂d
 end
 
-
-function ChainRulesCore.rrule(
-    ::typeof(rqs_backward),
-    x::AbstractArray{<:Real},
-    w::AbstractArray{<:Real},
-    h::AbstractArray{<:Real},
-    d::AbstractArray{<:Real}
-)
-
-    y, logJac = rqs_backward(x, w, h, d)
-    compute_unit = get_compute_unit(x)
-
-    pullback(tangent) = (NoTangent(), @thunk(tangent[1] .* exp.(logJac)), rqs_pullback(eval_backward_rqs_params_with_grad, x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...)
-
-    return (y, logJac), pullback
-end
 
 """
     eval_backward_rqs_params_with_grad(wₖ::M0, wₖ₊₁::M0, 
