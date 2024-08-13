@@ -99,15 +99,15 @@ end
 
 export InvRQSpline
 
-(f::InvRQSpline{<:Any,1})(x::Real) = rqs_backward(x, f.pX, f.pY, f.dYdX)[1]
-(f::InvRQSpline{<:Any,3})(x::AbstractMatrix{<:Real}) = rqs_backward(x, f.pX, f.pY, f.dYdX)[1]
+(f::InvRQSpline{<:Any,1})(x::Real) = rqs_inverse(x, f.pX, f.pY, f.dYdX)[1]
+(f::InvRQSpline{<:Any,3})(x::AbstractMatrix{<:Real}) = rqs_inverse(x, f.pX, f.pY, f.dYdX)[1]
 
 function ChangesOfVariables.with_logabsdet_jacobian(f::InvRQSpline{<:Any,1}, x::Real)
-    return rqs_backward(x, f.pX, f.pY, f.dYdX)
+    return rqs_inverse(x, f.pX, f.pY, f.dYdX)
 end
 
 function ChangesOfVariables.with_logabsdet_jacobian(f::InvRQSpline{<:Any,3}, x::AbstractMatrix{<:Real} )
-    return rqs_backward(x, f.pX, f.pY, f.dYdX)
+    return rqs_inverse(x, f.pX, f.pY, f.dYdX)
 end
 
 
@@ -242,8 +242,8 @@ end
 
 
 """
-    MonotonicSplines.rqs_backward(x::Real, w::AbstractVector{<:Real}, h::AbstractVector{<:Real}, d::AbstractVector{<:Real})
-    MonotonicSplines.rqs_backward(X::AbstractArray{<:Real,2}, w::AbstractArray{<:Real,3}, h::AbstractArray{<:Real,3}, d::AbstractArray{<:Real,3})
+    MonotonicSplines.rqs_inverse(x::Real, w::AbstractVector{<:Real}, h::AbstractVector{<:Real}, d::AbstractVector{<:Real})
+    MonotonicSplines.rqs_inverse(X::AbstractArray{<:Real,2}, w::AbstractArray{<:Real,3}, h::AbstractArray{<:Real,3}, d::AbstractArray{<:Real,3})
 
 Apply the inverse of the rational quadratic spline function(s) defined by the
 parameters `w` (pX), `h` (pY), and `d` (dYdX), to the input(s)
@@ -251,9 +251,9 @@ parameters `w` (pX), `h` (pY), and `d` (dYdX), to the input(s)
 
 See [`InvRQSpline`](@ref) for more details.
 """
-function rqs_backward end
+function rqs_inverse end
 
-function rqs_backward(
+function rqs_inverse(
     x::Real,
     w::AbstractVector{<:Real},
     h::AbstractVector{<:Real},
@@ -270,7 +270,7 @@ function rqs_backward(
     k = Base.ifelse(isinside, k1, k2)
 
     x_tmp = Base.ifelse(isinside, x, w[k])  # Simplifies unnecessary calculations
-    (y_tmp, logJac_tmp) = eval_backward_rqs_params(w[k], w[k+1], h[k], h[k+1], d[k], d[k+1], x_tmp)
+    (y_tmp, logJac_tmp) = eval_inverse_rqs_params(w[k], w[k+1], h[k], h[k+1], d[k], d[k+1], x_tmp)
 
     y = Base.ifelse(isinside, y_tmp, x) 
     logJac = Base.ifelse(isinside, logJac_tmp, zero(typeof(logJac_tmp)))
@@ -278,7 +278,7 @@ function rqs_backward(
     return y, logJac
 end
 
-function rqs_backward(
+function rqs_inverse(
         x::AbstractArray{<:Real,2},
         w::AbstractArray{<:Real,3},
         h::AbstractArray{<:Real,3},
@@ -320,7 +320,7 @@ end
     k = Base.ifelse(isinside, k1, k2)
 
     x_tmp = Base.ifelse(isinside, x[i,j], w[k,i,j])  # Simplifies unnecessary calculations
-    (yᵢⱼ, LogJacᵢⱼ) = eval_backward_rqs_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
+    (yᵢⱼ, LogJacᵢⱼ) = eval_inverse_rqs_params(w[k,i,j], w[k+1,i,j], h[k,i,j], h[k+1,i,j], d[k,i,j], d[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
     logJac[i, j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
@@ -328,7 +328,7 @@ end
 
 
 """
-    MonotonicSplines.eval_backward_rqs_params(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
+    MonotonicSplines.eval_inverse_rqs_params(wₖ::Real, wₖ₊₁::Real, hₖ::Real, hₖ₊₁::Real, dₖ::Real, dₖ₊₁::Real, x::Real)
 
 Apply a rational quadratic spline segment to a number `x`, and calculate the logarithm of the absolute value of this function's derivative.
 
@@ -342,7 +342,7 @@ Apply a rational quadratic spline segment to a number `x`, and calculate the log
 - `y`: The transformed value after applying the rational quadratic spline segment to `x`.
 - `logJac`: The logarithm of the absolute value of the derivative of the segment at `x`.
 """
-function eval_backward_rqs_params(
+function eval_inverse_rqs_params(
     wₖ::M0, wₖ₊₁::M0, 
     hₖ::M1, hₖ₊₁::M1, 
     dₖ::M2, dₖ₊₁::M2, 

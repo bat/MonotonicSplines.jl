@@ -29,7 +29,7 @@ for compute_unit in compute_units
     local y_test = adapt(compute_unit, readdlm("test_outputs/y_test.txt"))
 
     local ladj_forward_test = adapt(compute_unit, readdlm("test_outputs/ladj_forward_test.txt"))
-    local ladj_backward_test = adapt(compute_unit, readdlm("test_outputs/ladj_backward_test.txt"))
+    local ladj_inverse_test = adapt(compute_unit, readdlm("test_outputs/ladj_inverse_test.txt"))
 
     local RQS_test = RQSpline(test_params_processed...)
     local RQS_inv_test = InvRQSpline(test_params_processed...)
@@ -51,7 +51,7 @@ for compute_unit in compute_units
 
     @testset "with_logabsdet_jacobian_$compute_unit_type" begin
         @test all(isapprox.(ChangesOfVariables.with_logabsdet_jacobian(RQS_test,x_test), (y_test, ladj_forward_test)))
-        @test all(isapprox.(ChangesOfVariables.with_logabsdet_jacobian(RQS_inv_test,y_test), (x_test, ladj_backward_test)))
+        @test all(isapprox.(ChangesOfVariables.with_logabsdet_jacobian(RQS_inv_test,y_test), (x_test, ladj_inverse_test)))
     end
 
     @testset "functor$compute_unit_type" begin
@@ -61,7 +61,7 @@ for compute_unit in compute_units
 
     @testset "rqs_low_lvl_applications_$compute_unit_type" begin
         @test all(isapprox.(MonotonicSplines.rqs_forward(x_test, w, h, d), (y_test, ladj_forward_test)))
-        @test all(isapprox.(MonotonicSplines.rqs_backward(y_test, w, h, d), (x_test, ladj_backward_test)))
+        @test all(isapprox.(MonotonicSplines.rqs_inverse(y_test, w, h, d), (x_test, ladj_inverse_test)))
     end
 
     @testset "rqs_kernels_$compute_unit_type" begin
@@ -74,10 +74,10 @@ for compute_unit in compute_units
 
         inverse_kernel_test = MonotonicSplines.rqs_inverse_kernel!(CPU(), 4)
         x_kernel_test = zeros(size(x_test)...)
-        ladj_backward_kernel_test = zeros(size(x_test)...)
-        inverse_kernel_test(y_test, x_kernel_test, ladj_backward_kernel_test, w,h,d, ndrange=size(x_test))
+        ladj_inverse_kernel_test = zeros(size(x_test)...)
+        inverse_kernel_test(y_test, x_kernel_test, ladj_inverse_kernel_test, w,h,d, ndrange=size(x_test))
 
         @test isapprox(x_kernel_test, x_test)
-        @test isapprox(sum(ladj_backward_kernel_test, dims = 1), ladj_backward_test)
+        @test isapprox(sum(ladj_inverse_kernel_test, dims = 1), ladj_inverse_test)
     end
 end

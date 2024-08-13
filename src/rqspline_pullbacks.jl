@@ -6,10 +6,10 @@
 Compute the gradients of the rational quadratic spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x` with respect to `w`, `h`, and `d`. 
 
 This function is designed to make the transformation using Rational Quadratic Splines in this package automatically differentiable.
-Whether the gradients of the forward or backward spline functions are calculated is determined by the `param_eval_function` argument.
+Whether the gradients of the forward or inverse spline functions are calculated is determined by the `param_eval_function` argument.
 
 # Arguments
-- `param_eval_function`: The function used to evaluate a spline segment. Different functions are used for the forward and backward spline functions.
+- `param_eval_function`: The function used to evaluate a spline segment. Different functions are used for the forward and inverse spline functions.
 - `x`: An array of real numbers at which the spline functions are evaluated.
 - `w`, `h`, `d`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively.
 - `tangent_1`, `tangent_2`: Arrays that hold the tangent vectors for the transformed output and the log abs det jacobians respectively.
@@ -91,7 +91,7 @@ end
 This kernel function calculates the gradients of the rational quadratic spline functions characterized by `w`, `h`, and `d`, evaluated at the values in `x` and of `logJac`.
 
 # Arguments
-- `param_eval_function` The function used to evaluate a spline segment. Different functions are used for the forward and backward passes.
+- `param_eval_function` The function used to evaluate a spline segment. Different functions are used for the forward and inverse passes.
 - `x`: An array of real numbers to which the spline functions are applied.
 - `w`, `h`, `d`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively.
 - `y`: An array where the transformed values are stored.
@@ -248,7 +248,7 @@ end
 
 
 """
-    eval_backward_rqs_params_with_grad(wₖ::M0, wₖ₊₁::M0, 
+    eval_inverse_rqs_params_with_grad(wₖ::M0, wₖ₊₁::M0, 
                                        hₖ::M1, hₖ₊₁::M1, 
                                        dₖ::M2, dₖ₊₁::M2, 
                                        x::M3            ) where {M0<:Real,M1<:Real, M2<:Real, M3<:Real}
@@ -268,7 +268,7 @@ and compute the gradient of that segment and the LogJac with respect to the spli
 - `∂y∂w`, `∂y∂h`, `∂y∂d`: The gradients of `y` with respect to the two width, height, and derivative parameters, respectively.
 - `∂LogJac∂w`, `∂LogJac∂h`, `∂LogJac∂d`: The gradients of `LogJac` with respect to the two width, height, and derivative parameters, respectively.
 """
-function eval_backward_rqs_params_with_grad(
+function eval_inverse_rqs_params_with_grad(
     wₖ::M0, wₖ₊₁::M0, 
     hₖ::M1, hₖ₊₁::M1, 
     dₖ::M2, dₖ₊₁::M2, 

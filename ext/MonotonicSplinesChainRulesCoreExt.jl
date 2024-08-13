@@ -3,7 +3,7 @@
 module MonotonicSplinesChainRulesCoreExt
 
 using MonotonicSplines
-using MonotonicSplines: rqs_forward, rqs_backward
+using MonotonicSplines: rqs_forward, rqs_inverse
 
 import ChainRulesCore
 using ChainRulesCore: @thunk, NoTangent
@@ -31,20 +31,20 @@ end
 
 
 function ChainRulesCore.rrule(
-    ::typeof(rqs_backward),
+    ::typeof(rqs_inverse),
     x::AbstractArray{<:Real},
     w::AbstractArray{<:Real},
     h::AbstractArray{<:Real},
     d::AbstractArray{<:Real}
 )
 
-    y, logJac = rqs_backward(x, w, h, d)
+    y, logJac = rqs_inverse(x, w, h, d)
     compute_unit = get_compute_unit(x)
 
     pullback(tangent) = (
         NoTangent(),
         @thunk(tangent[1] .* exp.(logJac)),
-        rqs_pullback(eval_backward_rqs_params_with_grad, x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...
+        rqs_pullback(eval_inverse_rqs_params_with_grad, x, w, h, d, adapt(compute_unit, tangent[1]), adapt(compute_unit, tangent[2]))...
     )
 
     return (y, logJac), pullback
