@@ -116,15 +116,6 @@ function _softplus_tri(x::AbstractArray)
     return log.(exp.(x) .+ 1) 
 end
 
-KernelAbstractions.isgpu(::AbstractGPUnit) = true
-KernelAbstractions.isgpu(::CPUnit) = false
-
-function KernelAbstractions.construct(backend::Backend, ::S, ::NDRange, xpu_name::XPUName) where {Backend<:AbstractComputeUnit, S<:KernelAbstractions._Size, NDRange<:KernelAbstractions._Size, XPUName}
-    
-    compute_unit = Backend<:AbstractGPUnit ? KernelAbstractions.GPU : KernelAbstractions.CPU
-
-    return KernelAbstractions.Kernel{compute_unit, S, NDRange, XPUName}(backend, xpu_name)
-end
 
 midpoint(lo::T, hi::T) where T<:Integer = lo + ((hi - lo) >>> 0x01)
 binary_log(x::T) where {T<:Integer} = 8 * sizeof(T) - leading_zeros(x - 1)
@@ -149,3 +140,7 @@ function searchsortedfirst_impl(
     end
     return hi
 end
+
+
+_ka_threads(::KernelAbstractions.CPU) = (Base.Threads.nthreads(),)
+_ka_threads(::KernelAbstractions.Backend) = ()

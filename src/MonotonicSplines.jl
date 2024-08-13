@@ -15,6 +15,7 @@ using LinearAlgebra
 import ChangesOfVariables
 
 using HeterogeneousComputing
+using HeterogeneousComputing: ka_backend
 
 using KernelAbstractions
 

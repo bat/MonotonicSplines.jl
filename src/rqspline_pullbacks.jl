@@ -38,9 +38,9 @@ function rqs_pullback(
     tangent_1::AbstractArray{<:Real},
     tangent_2::AbstractArray{<:Real};
 ) 
-
     compute_unit = get_compute_unit(x)
-    n = compute_unit isa AbstractGPUnit ? 256 : Threads.nthreads()
+    backend = ka_backend(compute_unit)
+    kernel! = rqs_pullback_kernel!(backend, _ka_threads(backend)...)
 
     y = similar(x)
     logJac = similar(x)
@@ -52,8 +52,6 @@ function rqs_pullback(
     ∂LogJac∂w = fill!(similar(w), zero(eltype(w)))
     ∂LogJac∂h = fill!(similar(h), zero(eltype(h)))
     ∂LogJac∂d = fill!(similar(d), zero(eltype(d)))
-
-    kernel! = rqs_pullback_kernel!(compute_unit, n)
 
     kernel!(
         param_eval_function,

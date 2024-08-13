@@ -164,8 +164,8 @@ function rqs_forward(
     ) 
 
     compute_unit = get_compute_unit(x)
-    n = compute_unit isa AbstractGPUnit ? 256 : Threads.nthreads()
-    kernel! = rqs_forward_kernel!(compute_unit, n)
+    backend = ka_backend(compute_unit)
+    kernel! = rqs_forward_kernel!(backend, _ka_threads(backend)...)
 
     y = similar(x)
     logJac = similar(x)
@@ -320,8 +320,8 @@ function rqs_backward(
     )
 
     compute_unit = get_compute_unit(x)
-    n = compute_unit isa AbstractGPUnit ? 256 : Threads.nthreads()
-    kernel! = rqs_backward_kernel!(compute_unit, n)
+    backend = ka_backend(compute_unit)
+    kernel! = rqs_inverse_kernel!(backend, _ka_threads(backend)...)
 
     y = similar(x)
     logJac = similar(x) 
