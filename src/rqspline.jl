@@ -33,10 +33,13 @@ It uses `KernelAbstractions.jl` for parallel execution on either a CPU or a GPU,
 differentiation, providing precise and efficient gradient computations.
 
 """
-struct RQSpline <: Function
-    widths::AbstractArray{<:Real}
-    heights::AbstractArray{<:Real}
-    derivatives::AbstractArray{<:Real}
+struct RQSpline{
+    T<:Real, N,
+    TX<:AbstractArray{T,N}, TY<:AbstractArray{T,N}, TD<:AbstractArray{T,N}
+} <: Function
+    widths::TX
+    heights::TY
+    derivatives::TD
 end
 
 export RQSpline
@@ -87,10 +90,13 @@ The same parameters are used to characterize both the forward (`RQSpline`) and i
 The struct used to store them determines the equation they are evaluated in.
 
 """
-struct InvRQSpline <: Function
-    widths::AbstractArray{<:Real}
-    heights::AbstractArray{<:Real}
-    derivatives::AbstractArray{<:Real}
+struct InvRQSpline{
+    T<:Real, N,
+    TX<:AbstractArray{T,N}, TY<:AbstractArray{T,N}, TD<:AbstractArray{T,N}
+} <: Function
+    widths::TX
+    heights::TY
+    derivatives::TD
 end
 
 @functor InvRQSpline
