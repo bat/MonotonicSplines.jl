@@ -379,6 +379,3 @@ function eval_backward_rqs_params(
 
     return y, LogJac
 end
-
-# For debugging 
-export eval_backward_rqs_params
