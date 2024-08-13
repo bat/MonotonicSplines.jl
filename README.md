@@ -66,7 +66,7 @@ f_{\theta_{D}}(x_{D})   \\
 = \mathbf{y}
 \end{align*}
 ```
-Here $`f_{\theta_j} : \mathbb{R} \rightarrow \mathbb{R} ~~ (j = d,...,D)~`$  denotes a single spline function, characterized by the parameters $`~\theta_{j} = (\text{widths}_j~, ~\text{heigths}_j~,~\text{derivatives}_j)`$ in the case of the rational quadratic spline functions defined in ["Neural Spline Flows, Durkan et al. 2019"](https://arxiv.org/abs/1906.04032). 
+Here $`f_{\theta_j} : \mathbb{R} \rightarrow \mathbb{R} ~~ (j = d,...,D)~`$  denotes a single spline function, characterized by the parameters $`~\theta_{j} = (\text{pX}_j~, ~\text{heigths}_j~,~\text{dYdX}_j)`$ in the case of the rational quadratic spline functions defined in ["Neural Spline Flows, Durkan et al. 2019"](https://arxiv.org/abs/1906.04032). 
 
 Consider a single sample $`\mathbf{x}_i \in \mathbb{R}^D`$ from our sample set. 
 
@@ -86,20 +86,20 @@ To achieve this, each of the $`(D-d) \cdot N_{\text{samples}}`$ components to be
 
 So the spline function $`f_{\theta_j}^{(i)}`$ is applied to the $`j`$ -th component of the $`i`$ -th sample.
 
-Given the output `params_raw` of the neural net $`NN`$, we can obtain the `widths`, `heights`, and `derivatives` to characterize the desired spline function as follows:
+Given the output `params_raw` of the neural net $`NN`$, we can obtain the `pX`, `pY`, and `dYdX` to characterize the desired spline function as follows:
 ```Julia
-julia> widths, heights, derivatives = get_params(params_raw, n_dims_to_transform) 
+julia> pX, pY, dYdX = get_params(params_raw, n_dims_to_transform) 
 ```
 Here, `params_raw` is a `3(K-1) * n_dims_to_transform x n_samples` -matrix. `K` again is the number of spline segments and `n_dims_to_transform` $`~= D-d~`$ is the number of components to transform per sample. 
 
 The `i` -th column of this matrix `params_raw` is the output of the neural net $`NN`$ with the first $`d`$ components $`\{ x_{i,1},..., x_{i,d}\}`$ of the `i` -th sample $`\mathbf{x}_i`$ as the input.
 
-`widths`, `heights`, and `derivatives` each are `K x n_dims_to_transform x n_samples` -arrays. The `[:,j,i]` entries hold the parameters to characterize $`f_{\theta_j}^{(i)}`$, the spline function to transform the `j` -th component of the `i` -th sample from the sample set.
+`pX`, `pY`, and `dYdX` each are `K x n_dims_to_transform x n_samples` -arrays. The `[:,j,i]` entries hold the parameters to characterize $`f_{\theta_j}^{(i)}`$, the spline function to transform the `j` -th component of the `i` -th sample from the sample set.
 
 We then define the set of spline functions by:
 
 ```Julia
-julia> rqs_splines = RQSpline(widths, heights, derivatives)
+julia> rqs_splines = RQSpline(pX, pY, dYdX)
 ```
 An object holding the parameters to characterize `n_dims_to_transform x n_samples` spline functions.
 

@@ -12,19 +12,19 @@ Implements the splines originally proposed by Gregory and Delbourgo
 Constructors:
 
 ```julia
-RQSpline(widths::AbstractVector{<:Real}, heights::AbstractVector{<:Real}, derivatives::AbstractVector{<:Real})
-RQSpline(widths::AbstractArray{<:Real,3}, heights::AbstractArray{<:Real,3}, derivatives::AbstractArray{<:Real,3})
+RQSpline(pX::AbstractVector{<:Real}, pY::AbstractVector{<:Real}, dYdX::AbstractVector{<:Real})
+RQSpline(pX::AbstractArray{<:Real,3}, pY::AbstractArray{<:Real,3}, dYdX::AbstractArray{<:Real,3})
 ```
 
 Fields:
 
-- `widths`: An array that holds the x-position of the spline knots.
+- `pX`: An array that holds the x-position of the spline knots.
 
-- `heights`: An array that holds the y-position of the spline knots.
+- `pY`: An array that holds the y-position of the spline knots.
 
-- `derivatives`: An array that holds the derivative at the spline knots.
+- `dYdX`: An array that holds the derivative at the spline knots.
 
-`widths`, `heights` and `derivatives` may be
+`pX`, `pY` and `dYdX` may be
 
 - vectors of length `K+1`, representing a one-dimensional spline with `K` segments, or
 
@@ -57,22 +57,22 @@ struct RQSpline{
     T<:Real, N,
     TX<:AbstractArray{T,N}, TY<:AbstractArray{T,N}, TD<:AbstractArray{T,N}
 } <: Function
-    widths::TX
-    heights::TY
-    derivatives::TD
+    pX::TX
+    pY::TY
+    dYdX::TD
 end
 
 export RQSpline
 
-(f::RQSpline{<:Any,1})(x::Real) = rqs_forward(x, f.widths, f.heights, f.derivatives)[1]
-(f::RQSpline{<:Any,3})(x::AbstractMatrix{<:Real}) = rqs_forward(x, f.widths, f.heights, f.derivatives)[1]
+(f::RQSpline{<:Any,1})(x::Real) = rqs_forward(x, f.pX, f.pY, f.dYdX)[1]
+(f::RQSpline{<:Any,3})(x::AbstractMatrix{<:Real}) = rqs_forward(x, f.pX, f.pY, f.dYdX)[1]
 
 function ChangesOfVariables.with_logabsdet_jacobian(f::RQSpline{<:Any,1}, x::Real)
-    return rqs_forward(x, f.widths, f.heights, f.derivatives)
+    return rqs_forward(x, f.pX, f.pY, f.dYdX)
 end
 
 function ChangesOfVariables.with_logabsdet_jacobian(f::RQSpline{<:Any,3}, x::AbstractMatrix{<:Real} )
-    return rqs_forward(x, f.widths, f.heights, f.derivatives)
+    return rqs_forward(x, f.pX, f.pY, f.dYdX)
 end
 
 
@@ -92,22 +92,22 @@ struct InvRQSpline{
     T<:Real, N,
     TX<:AbstractArray{T,N}, TY<:AbstractArray{T,N}, TD<:AbstractArray{T,N}
 } <: Function
-    widths::TX
-    heights::TY
-    derivatives::TD
+    pX::TX
+    pY::TY
+    dYdX::TD
 end
 
 export InvRQSpline
 
-(f::InvRQSpline{<:Any,1})(x::Real) = rqs_backward(x, f.widths, f.heights, f.derivatives)[1]
-(f::InvRQSpline{<:Any,3})(x::AbstractMatrix{<:Real}) = rqs_backward(x, f.widths, f.heights, f.derivatives)[1]
+(f::InvRQSpline{<:Any,1})(x::Real) = rqs_backward(x, f.pX, f.pY, f.dYdX)[1]
+(f::InvRQSpline{<:Any,3})(x::AbstractMatrix{<:Real}) = rqs_backward(x, f.pX, f.pY, f.dYdX)[1]
 
 function ChangesOfVariables.with_logabsdet_jacobian(f::InvRQSpline{<:Any,1}, x::Real)
-    return rqs_backward(x, f.widths, f.heights, f.derivatives)
+    return rqs_backward(x, f.pX, f.pY, f.dYdX)
 end
 
 function ChangesOfVariables.with_logabsdet_jacobian(f::InvRQSpline{<:Any,3}, x::AbstractMatrix{<:Real} )
-    return rqs_backward(x, f.widths, f.heights, f.derivatives)
+    return rqs_backward(x, f.pX, f.pY, f.dYdX)
 end
 
 
@@ -117,7 +117,7 @@ end
     MonotonicSplines.rqs_forward(X::AbstractArray{<:Real,2}, w::AbstractArray{<:Real,3}, h::AbstractArray{<:Real,3}, d::AbstractArray{<:Real,3})
 
 Apply the rational quadratic spline function(s) defined by the parameters `w`
-(widths), `h` (heights), and `d` (derivatives), to the input(s) `X`.
+(pX), `h` (pY), and `d` (dYdX), to the input(s) `X`.
 
 See [`RQSpline`](@ref) for more details.
 """
@@ -246,7 +246,7 @@ end
     MonotonicSplines.rqs_backward(X::AbstractArray{<:Real,2}, w::AbstractArray{<:Real,3}, h::AbstractArray{<:Real,3}, d::AbstractArray{<:Real,3})
 
 Apply the inverse of the rational quadratic spline function(s) defined by the
-parameters `w` (widths), `h` (heights), and `d` (derivatives), to the input(s)
+parameters `w` (pX), `h` (pY), and `d` (dYdX), to the input(s)
 `X`.
 
 See [`InvRQSpline`](@ref) for more details.
@@ -298,7 +298,7 @@ function rqs_backward(
 end
 
 
-@kernel function rqs_backward_kernel!(
+@kernel function rqs_inverse_kernel!(
         x::AbstractArray{<:Real},
         y::AbstractArray{<:Real},
         logJac::AbstractArray{<:Real},

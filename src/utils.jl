@@ -8,10 +8,11 @@ Process the raw output parameters of a neural network to generate parameters for
 # Arguments
 - `θ_raw`: A matrix where each column represents the raw parameters for a sample.
 - `n_dims_trafo`: The number of spline functions for which parameters are to be produced.
-- `B`: A real number used to initialize the widths and heights of the spline functions. Default is 5.
+- `B`: A real number used to initialize the pX and pY of the spline functions. Default is 5.
 
 # Returns
-- A tuple `w, h, d` containing the widths, heights, and derivative parameters of the spline functions. The parameters are stored in a `K+1 x n_spline_functions_per_sample x n_samples` array.
+- A tuple `w, h, d` containing the positions of and derivatives at the spline knots.
+  The parameters are stored in a `K+1 x n_spline_functions_per_sample x n_samples` array.
 """
 function get_params(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
     N = size(θ_raw, 2)

@@ -5,7 +5,7 @@ module MonotonicSplinesInverseFunctionsExt
 using MonotonicSplines
 import InverseFunctions
 
-InverseFunctions.inverse(f::RQSpline) = InvRQSpline(f.widths, f.heights, f.derivatives)
-InverseFunctions.inverse(f::InvRQSpline) = RQSpline(f.widths, f.heights, f.derivatives)
+InverseFunctions.inverse(f::RQSpline) = InvRQSpline(f.pX, f.pY, f.dYdX)
+InverseFunctions.inverse(f::InvRQSpline) = RQSpline(f.pX, f.pY, f.dYdX)
 
 end # module MonotonicSplinesInverseFunctionsExt

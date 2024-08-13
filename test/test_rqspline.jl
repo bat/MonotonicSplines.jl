@@ -35,8 +35,8 @@ for compute_unit in compute_units
     local RQS_inv_test = InvRQSpline(test_params_processed...)
 
     @testset "rqs_structs_$compute_unit_type" begin
-        @test RQS_test isa RQSpline && isapprox(RQS_test.widths, w) && isapprox(RQS_test.heights, h) && isapprox(RQS_test.derivatives, d)
-        @test RQS_inv_test isa InvRQSpline && isapprox(RQS_inv_test.widths, w) && isapprox(RQS_inv_test.heights, h) && isapprox(RQS_inv_test.derivatives, d)
+        @test RQS_test isa RQSpline && isapprox(RQS_test.pX, w) && isapprox(RQS_test.pY, h) && isapprox(RQS_test.dYdX, d)
+        @test RQS_inv_test isa InvRQSpline && isapprox(RQS_inv_test.pX, w) && isapprox(RQS_inv_test.pY, h) && isapprox(RQS_inv_test.dYdX, d)
     end
 
     @testset "rqs_high_lvl_applications_$compute_unit_type" begin
@@ -72,10 +72,10 @@ for compute_unit in compute_units
         @test isapprox(y_kernel_test, y_test)
         @test isapprox(sum(ladj_forward_kernel_test, dims = 1), ladj_forward_test)
 
-        backward_kernel_test = MonotonicSplines.rqs_backward_kernel!(CPU(), 4)
+        inverse_kernel_test = MonotonicSplines.rqs_inverse_kernel!(CPU(), 4)
         x_kernel_test = zeros(size(x_test)...)
         ladj_backward_kernel_test = zeros(size(x_test)...)
-        backward_kernel_test(y_test, x_kernel_test, ladj_backward_kernel_test, w,h,d, ndrange=size(x_test))
+        inverse_kernel_test(y_test, x_kernel_test, ladj_backward_kernel_test, w,h,d, ndrange=size(x_test))
 
         @test isapprox(x_kernel_test, x_test)
         @test isapprox(sum(ladj_backward_kernel_test, dims = 1), ladj_backward_test)
