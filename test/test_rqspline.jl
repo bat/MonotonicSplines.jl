@@ -10,6 +10,7 @@ using MonotonicSplines
 using Test
 
 import InverseFunctions
+using Functors: functor
 
 compute_units = isdefined(Main, :CUDA) ? [AbstractComputeUnit(CUDA.device()), CPUnit()] : [CPUnit()]
 
@@ -51,6 +52,11 @@ for compute_unit in compute_units
     @testset "with_logabsdet_jacobian_$compute_unit_type" begin
         @test all(isapprox.(ChangesOfVariables.with_logabsdet_jacobian(RQS_test,x_test), (y_test, ladj_forward_test)))
         @test all(isapprox.(ChangesOfVariables.with_logabsdet_jacobian(RQS_inv_test,y_test), (x_test, ladj_backward_test)))
+    end
+
+    @testset "functor$compute_unit_type" begin
+        @test functor(RQS_test)[1] isa NamedTuple
+        @test functor(RQS_inv_test)[1] isa NamedTuple
     end
 
     @testset "rqs_low_lvl_applications_$compute_unit_type" begin

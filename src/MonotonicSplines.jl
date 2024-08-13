@@ -19,9 +19,6 @@ import ChangesOfVariables
 
 using HeterogeneousComputing
 
-import Functors
-using Functors: @functor
-
 using KernelAbstractions
 
 include("rqspline.jl")

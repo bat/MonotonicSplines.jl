@@ -43,7 +43,6 @@ struct RQSpline{
 end
 
 export RQSpline
-@functor RQSpline
 
 (f::RQSpline)(x::AbstractMatrix{<:Real}) = spline_forward(f, x)[1]
 
@@ -99,7 +98,6 @@ struct InvRQSpline{
     derivatives::TD
 end
 
-@functor InvRQSpline
 export InvRQSpline
 
 (f::InvRQSpline)(x::AbstractMatrix{<:Real}) = spline_backward(f, x)[1]
