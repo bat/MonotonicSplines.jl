@@ -9,8 +9,12 @@ using KernelAbstractions
 using MonotonicSplines
 using Test
 
+using MonotonicSplines: rqs_forward, rqs_inverse
+
 import InverseFunctions
 using Functors: functor
+
+import Zygote
 
 compute_units = isdefined(Main, :CUDA) ? [AbstractComputeUnit(CUDA.device()), CPUnit()] : [CPUnit()]
 
@@ -57,6 +61,23 @@ for compute_unit in compute_units
     @testset "functor_$compute_unit_type" begin
         @test functor(RQS_test)[1] isa NamedTuple
         @test functor(RQS_inv_test)[1] isa NamedTuple
+    end
+
+    @testset "rrule_$compute_unit_type" begin
+        @test length((map(unthunk, rrule(rqs_forward, x_test, RQS_test.pX, RQS_test.pY, RQS_test.dYdX)[2]((y_test, ladj_forward_test))))) == 5
+        @test length((map(unthunk, rrule(rqs_inverse, y_test, RQS_inv_test.pX, RQS_inv_test.pY, RQS_inv_test.dYdX)[2]((x_test, ladj_inverse_test))))) == 5
+        @test length((map(unthunk, rrule(rqs_forward, x_test, RQS_test.pX, RQS_test.pY, RQS_test.dYdX)[2]((y_test, ZeroTangent()))))) == 5
+        @test length((map(unthunk, rrule(rqs_inverse, y_test, RQS_inv_test.pX, RQS_inv_test.pY, RQS_inv_test.dYdX)[2]((x_test, ZeroTangent()))))) == 5
+        @test length((map(unthunk, rrule(rqs_forward, x_test, RQS_test.pX, RQS_test.pY, RQS_test.dYdX)[2]((ZeroTangent(), ladj_forward_test))))) == 5
+        @test length((map(unthunk, rrule(rqs_inverse, y_test, RQS_inv_test.pX, RQS_inv_test.pY, RQS_inv_test.dYdX)[2]((ZeroTangent(), ladj_inverse_test))))) == 5
+
+        @test Zygote.gradient(sum ∘ RQS_test, x_test) isa Tuple{AbstractArray}
+        @test Zygote.gradient((f, x) -> sum(f(x)), RQS_test, x_test) isa Tuple{NamedTuple, AbstractArray}
+        @test Zygote.gradient((f, x) -> sum(map(sum, with_logabsdet_jacobian(f, x))), RQS_test, x_test) isa Tuple{NamedTuple, AbstractArray}
+
+        @test Zygote.gradient(sum ∘ RQS_inv_test, y_test) isa Tuple{AbstractArray}
+        @test Zygote.gradient((f, x) -> sum(f(x)), RQS_inv_test, y_test) isa Tuple{NamedTuple, AbstractArray}
+        @test Zygote.gradient((f, x) -> sum(map(sum, with_logabsdet_jacobian(f, x))), RQS_inv_test, y_test) isa Tuple{NamedTuple, AbstractArray}
     end
 
     @testset "singledim_$compute_unit_type" begin
