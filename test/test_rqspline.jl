@@ -54,9 +54,43 @@ for compute_unit in compute_units
         @test all(isapprox.(ChangesOfVariables.with_logabsdet_jacobian(RQS_inv_test,y_test), (x_test, ladj_inverse_test)))
     end
 
-    @testset "functor$compute_unit_type" begin
+    @testset "functor_$compute_unit_type" begin
         @test functor(RQS_test)[1] isa NamedTuple
         @test functor(RQS_inv_test)[1] isa NamedTuple
+    end
+
+    @testset "singledim_$compute_unit_type" begin
+        # Works on CUDA:
+
+        local pX = adapt(compute_unit, Float32[0.0, 0.15, 0.20, 0.45, 0.65, 0.80, 1.0])
+        local pY = adapt(compute_unit, Float32[0.0, 0.10, 0.25, 0.40, 0.55, 0.70, 1.0])
+        local dYdX = adapt(compute_unit, Float32[0.5, 1.3, 0.8, 0.9, 0.7, 1.2, 1.1])
+        local X = adapt(compute_unit, rand(Float32, 10^3))
+        local XM = permutedims(X)
+        local n = length(X)
+        local M = adapt(compute_unit, fill(one(Float32), 1, 1, n))
+        local f = RQSpline(pX, pY, dYdX)
+        local fM = RQSpline(pX .* M, pY .* M, dYdX .* M)
+        local inv_f = InvRQSpline(pX, pY, dYdX)
+        local inv_fM = InvRQSpline(pX .* M, pY .* M, dYdX .* M)
+
+        @test @inferred(broadcast(f, X)) == vec(@inferred(fM(XM)))
+        Y = broadcast(f, X)
+        YM = fM(XM)
+        @test @inferred(broadcast(inv_f, Y)) == vec(@inferred(inv_fM(YM)))
+
+        # See issue #17:
+        @test_broken inv_f.(Y) ≈ X
+
+        Y_ladj = @inferred(broadcast(with_logabsdet_jacobian, f, X))
+        YM_ladj = @inferred(with_logabsdet_jacobian(fM, XM))
+        @test (x -> x[1]).(Y_ladj) == vec(YM_ladj[1])
+        @test (x -> x[2]).(Y_ladj) == vec(YM_ladj[2])
+
+        X2_ladj = @inferred(broadcast(with_logabsdet_jacobian, inv_f, Y))
+        XM2_ladj = @inferred(with_logabsdet_jacobian(inv_fM, YM))
+        @test (x -> x[1]).(X2_ladj) == vec(XM2_ladj[1])
+        @test (x -> x[2]).(X2_ladj) == vec(XM2_ladj[2])
     end
 
     @testset "rqs_low_lvl_applications_$compute_unit_type" begin
