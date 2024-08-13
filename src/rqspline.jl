@@ -174,11 +174,6 @@ function rqs_forward(
 end
 
 
-"""
-    KernelAbstractions.@kernel rqs_forward_kernel!(x::AbstractArray, y::AbstractArray, logJac::AbstractArray, w::AbstractArray, h::AbstractArray, d::AbstractArray)
-
-KernelAbstractions kernel that implements [`rqs_forward`](@ref).
-"""
 @kernel function rqs_forward_kernel!(
     x::AbstractArray{<:Real},
     y::AbstractArray{<:Real},
@@ -309,11 +304,6 @@ function rqs_backward(
 end
 
 
-"""
-    KernelAbstractions.@kernel rqs_backward_kernel!(x::AbstractArray, y::AbstractArray, logJac::AbstractArray, w::AbstractArray, h::AbstractArray, d::AbstractArray)
-
-KernelAbstractions kernel that implements [`rqs_backward`](@ref).
-"""
 @kernel function rqs_backward_kernel!(
         x::AbstractArray{<:Real},
         y::AbstractArray{<:Real},
