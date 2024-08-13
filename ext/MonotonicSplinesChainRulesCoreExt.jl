@@ -11,10 +11,10 @@ using ChainRulesCore: @thunk, NoTangent
 
 function ChainRulesCore.rrule(
     ::typeof(rqs_forward),
-    x::AbstractArray{<:Real},
-    pX::AbstractArray{<:Real},
-    pY::AbstractArray{<:Real},
-    dYdX::AbstractArray{<:Real}
+    x::AbstractArray{<:Real,2},
+    pX::AbstractArray{<:Real,3},
+    pY::AbstractArray{<:Real,3},
+    dYdX::AbstractArray{<:Real,3}
 )
 
     y, logJac = rqs_forward(x, pX, pY, dYdX)
@@ -32,10 +32,10 @@ end
 
 function ChainRulesCore.rrule(
     ::typeof(rqs_inverse),
-    x::AbstractArray{<:Real},
-    pX::AbstractArray{<:Real},
-    pY::AbstractArray{<:Real},
-    dYdX::AbstractArray{<:Real}
+    x::AbstractArray{<:Real,2},
+    pX::AbstractArray{<:Real,3},
+    pY::AbstractArray{<:Real,3},
+    dYdX::AbstractArray{<:Real,3}
 )
 
     y, logJac = rqs_inverse(x, pX, pY, dYdX)
