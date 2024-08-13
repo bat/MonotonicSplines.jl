@@ -111,9 +111,6 @@ function ChangesOfVariables.with_logabsdet_jacobian(f::InvRQSpline{<:Any,3}, x::
 end
 
 
-Base.@deprecate spline_forward(f::RQSpline, x::AbstractMatrix{<:Real}) rqs_forward(x, f.widths, f.heights, f.derivatives)
-
-
 
 """
     MonotonicSplines.rqs_forward(x::Real, w::AbstractVector{<:Real}, h::AbstractVector{<:Real}, d::AbstractVector{<:Real})
@@ -242,9 +239,6 @@ function eval_forward_rqs_params(
 
     return y, logJac
 end
-
-
-Base.@deprecate spline_backward(f::InvRQSpline, x::AbstractMatrix{<:Real}) rqs_backward(x, f.widths, f.heights, f.derivatives)
 
 
 """

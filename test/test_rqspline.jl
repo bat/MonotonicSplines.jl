@@ -60,8 +60,6 @@ for compute_unit in compute_units
     end
 
     @testset "rqs_low_lvl_applications_$compute_unit_type" begin
-        @test all(isapprox.(MonotonicSplines.spline_forward(RQS_test, x_test), (y_test, ladj_forward_test)))
-        @test all(isapprox.(MonotonicSplines.spline_backward(RQS_inv_test, y_test), (x_test, ladj_backward_test)))
         @test all(isapprox.(MonotonicSplines.rqs_forward(x_test, w, h, d), (y_test, ladj_forward_test)))
         @test all(isapprox.(MonotonicSplines.rqs_backward(y_test, w, h, d), (x_test, ladj_backward_test)))
     end
