@@ -9,6 +9,8 @@ using KernelAbstractions
 using MonotonicSplines
 using Test
 
+import InverseFunctions
+
 compute_units = isdefined(Main, :CUDA) ? [AbstractComputeUnit(CUDA.device()), CPUnit()] : [CPUnit()]
 
 for compute_unit in compute_units
@@ -39,6 +41,11 @@ for compute_unit in compute_units
     @testset "rqs_high_lvl_applications_$compute_unit_type" begin
         @test isapprox(RQS_test(x_test), y_test)
         @test isapprox(RQS_inv_test(y_test), x_test)
+    end
+
+    @testset "inverse_$compute_unit_type" begin
+        InverseFunctions.test_inverse(RQS_test, x_test)
+        InverseFunctions.test_inverse(RQS_inv_test, y_test)
     end
 
     @testset "with_logabsdet_jacobian_$compute_unit_type" begin
