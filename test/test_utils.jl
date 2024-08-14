@@ -31,6 +31,10 @@ softplus_tri_test_output = reshape(readdlm("test_outputs/softplus_tri_test_outpu
 softplus_matrix_test_output = readdlm("test_outputs/softplus_matrix_test_output.txt")
 softplus_vector_test_output = vec(readdlm("test_outputs/softplus_vector_test_output.txt"))
 
+@testset "estimate_dYdX" begin
+    @test @inferred(MonotonicSplines.estimate_dYdX([0.1, 0.3, 0.4, 0.7, 1.5, 1.8], [0.3, 0.6, 0.65, 1.1, 1.3, 1.9])) ≈ [1.5, 0.8333333333333339, 0.7499999999999987, 1.1590909090909078, 1.522727272727273, 1.9999999999999993]
+end
+
 @testset "parameter_processing_functions" begin
     @test all(isapprox.(rqs_params_from_nn(test_nn_output, n_dims_to_transform), test_params_processed))
 
