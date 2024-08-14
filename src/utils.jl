@@ -1,7 +1,7 @@
 # This file is a part of EuclidianNormalizingFlows.jl, licensed under the MIT License (MIT)
 
 """
-    get_params(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
+    MonotonicSplines.rqs_params_from_nn(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
 
 Process the raw output parameters of a neural network to generate parameters for a set of rational quadratic spline functions.
 
@@ -14,7 +14,7 @@ Process the raw output parameters of a neural network to generate parameters for
 - A tuple `pX, pY, dYdX` containing the positions of and derivatives at the spline knots.
   The parameters are stored in a `K+1 x n_spline_functions_per_sample x n_samples` array.
 """
-function get_params(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
+function rqs_params_from_nn(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
     N = size(θ_raw, 2)
     K = Int((size(θ_raw,1)/n_dims_trafo+1)/3)
     θ = reshape(θ_raw, :, n_dims_trafo, N)
@@ -28,7 +28,6 @@ function get_params(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
     return pX, pY, dYdX
 end
 
-export get_params
 
 # Non-public:
 #=

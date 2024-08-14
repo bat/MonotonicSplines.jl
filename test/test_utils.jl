@@ -1,6 +1,8 @@
 # This file is a part of MonotonicSplines.jl, licensed under the MIT License (MIT).
 
 using MonotonicSplines
+using MonotonicSplines: rqs_params_from_nn
+
 using Test
 using DelimitedFiles
 
@@ -30,7 +32,7 @@ softplus_matrix_test_output = readdlm("test_outputs/softplus_matrix_test_output.
 softplus_vector_test_output = vec(readdlm("test_outputs/softplus_vector_test_output.txt"))
 
 @testset "parameter_processing_functions" begin
-    @test all(isapprox.(get_params(test_nn_output, n_dims_to_transform), test_params_processed))
+    @test all(isapprox.(rqs_params_from_nn(test_nn_output, n_dims_to_transform), test_params_processed))
 
     @test isapprox(MonotonicSplines._softmax_tri(test_params_raw), softmax_tri_test_output)
     @test isapprox(MonotonicSplines._softmax(test_params_matrix), softmax_matrix_test_output)

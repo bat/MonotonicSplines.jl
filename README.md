@@ -88,7 +88,7 @@ So the spline function $`f_{\theta_j}^{(i)}`$ is applied to the $`j`$ -th compon
 
 Given the output `params_raw` of the neural net $`NN`$, we can obtain the `pX`, `pY`, and `dYdX` to characterize the desired spline function as follows:
 ```Julia
-julia> pX, pY, dYdX = get_params(params_raw, n_dims_to_transform) 
+julia> pX, pY, dYdX = rqs_params_from_nn(params_raw, n_dims_to_transform)
 ```
 Here, `params_raw` is a `3(K-1) * n_dims_to_transform x n_samples` -matrix. `K` again is the number of spline segments and `n_dims_to_transform` $`~= D-d~`$ is the number of components to transform per sample. 
 
