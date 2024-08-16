@@ -57,6 +57,13 @@ Example:
 dYdX = MonotonicSplines.estimate_dYdX(pX, pY)
 f = RQSpline(pX, pY, dYdX)
 ```
+
+When an RQSpline is intended to be used beyong the first and last knot, the
+first and last derivative should be one, so in that case use
+
+```julia
+f = RQSpline(pX, pY, vcat(1, dYdX[begin+1:end-1], 1))
+```
 """
 function estimate_dYdX(pX::AbstractVector{<:Real}, pY::AbstractVector{<:Real})
     deriv_est_first = (pY[begin+1] -  pY[begin]) / (pX[begin+1] - pX[begin])

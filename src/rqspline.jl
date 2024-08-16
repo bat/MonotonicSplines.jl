@@ -31,6 +31,10 @@ Fields:
 - three-dimensional arrays of the shape `K+1 x n_dims x n_samples`, representing a set of splines for different
   dimensions and input samples.
 
+The spline is continued with a linear function of slope one beyond the first
+and last knot, so the first and last entry of dYdX should be one if the spline
+is indended to be used at this extended range.
+
 `RQSpline` supports the InverseFunctions, ChangesOfVariables, and Functors
 APIs.
 
