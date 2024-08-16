@@ -41,21 +41,31 @@ APIs.
 Example:
 
 ```
-    using MonotonicSplines
+using MonotonicSplines
 
-    f = RQSpline(posX, posX, dY_dX)
-    Y = f(X)
+f = RQSpline(posX, posX, dY_dX)
+Y = f(X)
 
-    using InverseFunctions: inverse
-    X ≈ inverse(f)(Y)
+using InverseFunctions: inverse
+X ≈ inverse(f)(Y)
 
-    using ChangesOfVariables: with_logabsdet_jacobian
-    Y, LADJ = with_logabsdet_jacobian(f, X)
+using ChangesOfVariables: with_logabsdet_jacobian
+Y, LADJ = with_logabsdet_jacobian(f, X)
 ```
 
 When instantiated as a set of multi-dimension/samples splines, `RQSpline` uses
 the package KernelAbstractions for parallel CPU or GPU processing. Custom
 `ChainRulesCore` rules are provided for effecient automatic differentation.
+
+Random spline generation is supported and RQSpline comes with specialized
+support for Plots:
+
+```julia
+using MonotonicSplines, Plots, InverseFunctions
+f = rand(RQSpline)
+plot(f); plot!(inverse(f))
+plot(f, xlims = (-6, 6)); plot!(inverse(f), xlims = (-6, 6))
+```
 """
 struct RQSpline{
     T<:Real, N,
