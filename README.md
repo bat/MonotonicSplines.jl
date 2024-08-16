@@ -23,19 +23,7 @@ Please see the Documentation linked below for details.
 * [Documentation for stable version](https://bat.github.io/MonotonicSplines.jl/stable)
 * [Documentation for development version](https://bat.github.io/MonotonicSplines.jl/dev)
 
-## Installation
 
-To install `MonotonicSplines.jl`, start Julia and run 
-
-```Julia
-julia> using Pkg
-julia> pkg.add("MonotonicSplines.jl")
-```
-and 
-```Julia
-julia> using MonotonicSplines
-```
-to use the functions the package provides.
 
 ## Example usage of rational quadratic spline functions for use in Normalizing Flows
 
