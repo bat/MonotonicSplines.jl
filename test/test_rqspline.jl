@@ -16,6 +16,8 @@ using Functors: functor
 
 import Zygote
 
+import Plots
+
 compute_units = isdefined(Main, :CUDA) ? [AbstractComputeUnit(CUDA.device()), CPUnit()] : [CPUnit()]
 
 for compute_unit in compute_units
@@ -37,6 +39,9 @@ for compute_unit in compute_units
 
     local RQS_test = RQSpline(test_params_processed...)
     local RQS_inv_test = InvRQSpline(test_params_processed...)
+    
+    local RQS_test1D = RQSpline(RQS_test.pX[:,1,1], RQS_test.pY[:,1,1], RQS_test.dYdX[:,1,1])
+    local RQS_inv_test1D = InvRQSpline(RQS_inv_test.pX[:,1,1], RQS_inv_test.pY[:,1,1], RQS_inv_test.dYdX[:,1,1])
 
     @testset "rqs_structs_$compute_unit_type" begin
         @test RQS_test isa RQSpline && isapprox(RQS_test.pX, pX) && isapprox(RQS_test.pY, pY) && isapprox(RQS_test.dYdX, dYdX)
@@ -134,5 +139,16 @@ for compute_unit in compute_units
 
         @test isapprox(x_kernel_test, x_test)
         @test isapprox(sum(ladj_inverse_kernel_test, dims = 1), ladj_inverse_test)
+    end
+
+    if compute_unit isa CPUnit
+        @testset "plotting" begin
+            Plots.plot(RQS_test1D) isa Plots.Plot
+            Plots.plot(RQS_test1D, seriescolor = :green, xlims = (-6, 6)) isa Plots.Plot
+            Plots.plot(RQS_test1D, linecolor = :green, xlims = (-6, 6)) isa Plots.Plot
+            Plots.plot!(RQS_inv_test1D) isa Plots.Plot
+            Plots.plot!(RQS_inv_test1D, seriescolor = :green, xlims = (-6, 6)) isa Plots.Plot
+            Plots.plot!(RQS_inv_test1D, linecolor = :green, xlims = (-6, 6)) isa Plots.Plot
+        end
     end
 end
