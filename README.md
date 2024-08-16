@@ -24,6 +24,22 @@ Please see the Documentation linked below for details.
 * [Documentation for development version](https://bat.github.io/MonotonicSplines.jl/dev)
 
 
+## Quickstart
+
+```julia
+using MonotonicSplines, Plots, InverseFunctions, ChangesOfVariables
+
+f = rand(RQSpline)
+f.pX, f.pY, f.dYdX
+
+plot(f, xlims = (-6, 6)); plot!(inverse(f), xlims = (-6, 6))
+
+x = 1.2
+y = f(x)
+with_logabsdet_jacobian(f, x)
+inverse(f)(y)
+with_logabsdet_jacobian(inverse(f), y)
+```
 
 ## Example usage of rational quadratic spline functions for use in Normalizing Flows
 

@@ -14,6 +14,23 @@ The splines defined here support the [ChangesOfVariables](https://github.com/Jul
 The package uses [KernelAbstractions](https://github.com/JuliaGPU/KernelAbstractions.jl) to provide both GPU and multi-vendor GPU support.
 
 
+## Quickstart
+
+```julia
+using MonotonicSplines, Plots, InverseFunctions, ChangesOfVariables
+
+f = rand(RQSpline)
+f.pX, f.pY, f.dYdX
+
+plot(f, xlims = (-6, 6)); plot!(inverse(f), xlims = (-6, 6))
+
+x = 1.2
+y = f(x)
+with_logabsdet_jacobian(f, x)
+inverse(f)(y)
+with_logabsdet_jacobian(inverse(f), y)
+```
+
 ## Table of contents
 ---
 
