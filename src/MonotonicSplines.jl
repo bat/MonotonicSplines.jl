@@ -11,6 +11,8 @@ import Adapt
 using Adapt: adapt
 
 using LinearAlgebra
+import Random
+using Random: AbstractRNG
 
 import ChangesOfVariables
 

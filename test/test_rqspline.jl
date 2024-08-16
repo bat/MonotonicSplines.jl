@@ -142,6 +142,11 @@ for compute_unit in compute_units
     end
 
     if compute_unit isa CPUnit
+        @testset "random spline" begin
+            @test rand(RQSpline) isa RQSpline{Float64}
+            @test rand(RQSpline{Float32}) isa RQSpline{Float32}
+        end
+
         @testset "plotting" begin
             Plots.plot(RQS_test1D) isa Plots.Plot
             Plots.plot(RQS_test1D, seriescolor = :green, xlims = (-6, 6)) isa Plots.Plot

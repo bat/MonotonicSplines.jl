@@ -80,6 +80,28 @@ function ChangesOfVariables.with_logabsdet_jacobian(f::RQSpline{<:Any,3}, x::Abs
 end
 
 
+function rand_rqspline(rng::AbstractRNG, ::Type{T}) where T
+    n = 7
+    range = 4
+    pX = pushfirst!(cumsum(rand(rng, T, n-1)), 0)
+    pX .= pX ./ last(pX) .* 2*range .- range
+    pY = pushfirst!(cumsum(rand(rng, T, n-1)), 0)
+    pY .= pY ./ last(pY) .* 2*range .- range
+    est_dYdX = vcat(1, estimate_dYdX(pX, pY)[begin+1:end-1], 1)
+    mod_dYdX = vcat(1, exp.(randn(rng, T, n-2) .* 1//5), 1)
+    dYdX = est_dYdX .* mod_dYdX
+    return RQSpline(pX, pY, dYdX)
+end
+
+function Random.rand(r::AbstractRNG, ::Random.SamplerType{RQSpline{T}}) where T
+    return rand_rqspline(r, T)
+end
+
+function Random.rand(r::AbstractRNG, ::Random.SamplerType{RQSpline})
+    return rand_rqspline(r, Float64)
+end
+
+
 
 """
   struct InvRQSpline{T<:Real,N,...} <: Function
