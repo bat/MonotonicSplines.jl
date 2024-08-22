@@ -1,4 +1,4 @@
-# This file is a part of EuclidianNormalizingFlows.jl, licensed under the MIT License (MIT)
+# This file is a part of MonotonicSplines.jl, licensed under the MIT License (MIT)
 
 
 # Non-public:
