@@ -303,7 +303,7 @@ function rqs_inverse(
     k2 = one(typeof(k1))
 
     # Is inside of range
-    isinside = (k1 < K) && (k1 > 0)
+    isinside = (1 <= k1 <= K)
     k = Base.ifelse(isinside, k1, k2)
 
     x_tmp = Base.ifelse(isinside, x, pX[k])  # Simplifies unnecessary calculations
@@ -352,7 +352,7 @@ end
     k2 = one(typeof(k1))
 
     # Is inside of range
-    isinside = (k1 < K) && (k1 > 0)
+    isinside = (1 <= k1 <= K)
     k = Base.ifelse(isinside, k1, k2)
 
     x_tmp = Base.ifelse(isinside, x[i,j], pX[k,i,j])  # Simplifies unnecessary calculations

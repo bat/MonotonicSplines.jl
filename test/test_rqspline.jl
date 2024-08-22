@@ -105,8 +105,7 @@ for compute_unit in compute_units
         YM = fM(XM)
         @test @inferred(broadcast(inv_f, Y)) == vec(@inferred(inv_fM(YM)))
 
-        # See issue #17:
-        @test_broken inv_f.(Y) ≈ X
+        @test inv_f.(Y) ≈ X
 
         Y_ladj = @inferred(broadcast(with_logabsdet_jacobian, f, X))
         YM_ladj = @inferred(with_logabsdet_jacobian(fM, XM))
