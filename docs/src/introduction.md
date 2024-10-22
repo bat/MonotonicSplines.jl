@@ -21,7 +21,7 @@ In the ``k``-th bin (``1\leq k \leq K``), the respective spline segment ``f_k`` 
     f_k : [x_k, x_{k+1}) \rightarrow [-B,B], ~x \mapsto y_k + \frac{(y_{k+1}-y_{k})[s_k\xi^2+\delta_k\xi(1-\xi)]}{s_k+[\delta_{k+1}+\delta_k-2s_k]\xi(1-\xi)},
 ```
 ```math
-    \text{where} \quad s_k = s_k(x)= \frac{y_{k+1} - y_k}{x_{k+1}-x} \quad \text{and} \quad \xi = \xi(x) = \frac{x - x_k}{x_{k+1}-x_k}
+    \text{where} \quad s_k = \frac{y_{k+1} - y_k}{x_{k+1}-x_k} \quad \text{and} \quad \xi = \xi(x) = \frac{x - x_k}{x_{k+1}-x_k}
 ```
 The spline function ``f`` is then defined piece-wise from the segment functions within each bin. The segments of the inverse spline function ``f^{-1}`` are given by:
 ```math
