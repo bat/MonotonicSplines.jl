@@ -31,9 +31,16 @@ Fields:
 - three-dimensional arrays of the shape `K+1 x n_dims x n_samples`, representing a set of splines for different
   dimensions and input samples.
 
-The spline is continued with a linear function of slope one beyond the first
-and last knot, so the first and last entry of dYdX should be one if the spline
-is indended to be used at this extended range.
+Requirements for the fields: 
+
+Each spline is continued with the identity function beyond its first and last knot.
+So to ensure the continuity and differentiability of the splines, the first and last knots must lie on the 
+diagonal through 0, and the derivatives at these knots must be 1.
+Formally: 
+For parameter vectors `pX[1] == pY[1]` and `pX[end] == pY[end]` and `dYdX[1] == dYdX[end] == 1` must hold.
+For 3 dimensional parameter arrays `pX[1,:,:] == pY[1,:,:]` and `pX[end,:,:] == pY[end,:,:]` and 
+`dYdX[1,:,:] .== dYdX[end,:,:] .== 1` must be true.
+
 
 `RQSpline` supports the InverseFunctions, ChangesOfVariables, and Functors
 APIs.
@@ -215,7 +222,6 @@ end
     pY::AbstractArray{<:Real},
     dYdX::AbstractArray{<:Real}
 )
-
     i, j = @index(Global, NTuple)
 
     K = size(pX, 1) - 1
@@ -321,7 +327,6 @@ function rqs_inverse(
         pY::AbstractArray{<:Real,3},
         dYdX::AbstractArray{<:Real,3}
     )
-
     compute_unit = get_compute_unit(x)
     backend = ka_backend(compute_unit)
     kernel! = rqs_inverse_kernel!(backend, _ka_threads(backend)...)
