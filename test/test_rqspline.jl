@@ -64,8 +64,8 @@ for compute_unit in compute_units
     end
 
     @testset "functor_$compute_unit_type" begin
-        @test functor(RQS_test)[1] isa NamedTuple
-        @test functor(RQS_inv_test)[1] isa NamedTuple
+        @test functor(RQS_test)[1] isa NamedTuple{(:pX, :pY, :dYdX)}
+        @test functor(RQS_inv_test)[1] isa NamedTuple{(:pX, :pY, :dYdX)}
     end
 
     @testset "rrule_$compute_unit_type" begin
