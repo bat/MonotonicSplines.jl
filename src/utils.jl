@@ -98,100 +98,27 @@ function rqs_params_from_nn(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Rea
 
     compute_unit = get_compute_unit(θ_raw)
 
-    pX =  cat(adapt(compute_unit, fill(T(-B), 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[1:K,:,:]), T(B)); dims = 1)
-    pY =  cat(adapt(compute_unit, fill(T(-B), 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[K+1:2K,:,:]), T(B)); dims = 1)
-    dYdX =  cat(adapt(compute_unit, fill(T(1), 1, n_dims_trafo, N)), _softplus_tri(θ[2K+1:end,:,:]), adapt(compute_unit, fill(T(1), 1, n_dims_trafo, N)); dims = 1)
+    pX =  cat(adapt(compute_unit, fill(T(-B), 1, n_dims_trafo, N)), _cumsum(_softmax(θ[1:K,:,:]), T(B)); dims = 1)
+    pY =  cat(adapt(compute_unit, fill(T(-B), 1, n_dims_trafo, N)), _cumsum(_softmax(θ[K+1:2K,:,:]), T(B)); dims = 1)
+    dYdX =  cat(adapt(compute_unit, fill(T(1), 1, n_dims_trafo, N)), _softplus(θ[2K+1:end,:,:]), adapt(compute_unit, fill(T(1), 1, n_dims_trafo, N)); dims = 1)
 
     return pX, pY, dYdX
 end
 
 
-# Non-public:
-#=
-    _sort_dimensions(y₁::AbstractArray, y₂::AbstractArray, mask::AbstractVector)
-
-Create a new array by selectively replacing rows from `y₂` with corresponding rows from `y₁` based on a boolean mask, `mask`.
-
-# Arguments
-- `y₁`: An array from which rows are taken. It should have the same number of columns as `y₂`.
-- `y₂`: An array that serves as the base for the output. Rows specified by `mask` are replaced with corresponding rows from `y₁`.
-- `mask`: A boolean vector of the same length as the number of rows in `y₁` and `y₂`. If the i-th element of `mask` is true, the i-th row of `y₂` is replaced with the i-th row of `y₁` in the output.
-
-# Returns
-- `res`: An array of the same shape as `y₂`, but with rows specified by `mask` replaced with corresponding rows from `y₁`.
-=#
-function _sort_dimensions(y₁::AbstractArray, y₂::AbstractArray, mask::AbstractVector)
-    
-    if mask[1]
-        res = reshape(y₁[1,:],1,size(y₁,2))
-        c=2
-    else
-        res = reshape(y₂[1,:],1,size(y₁,2))
-        c=1
-    end
-
-    for (i,b) in enumerate(mask[2:end])
-        if b
-            res = vcat(res, reshape(y₁[c,:],1,size(y₁,2)))
-            c+=1
-        else
-            res = vcat(res, reshape(y₂[i+1,:],1,size(y₂,2)))
-        end
-    end
-
-    return res
-end
-
-function _softmax(x::AbstractVector)
-
-    exp_x = exp.(x)
-    sum_exp_x = sum(exp_x)
-
-    return exp_x ./ sum_exp_x 
-end
-
-function _softmax(x::AbstractMatrix)
-
-    val = cat([_softmax(i) for i in eachrow(x)]..., dims=2)'
-
-    return val 
-end
-
-function _softmax_tri(x::AbstractArray)
+function _softmax(x::AbstractArray)
     exp_x = exp.(x)
     inv_sum_exp_x = inv.(sum(exp_x, dims = 1))
 
     return inv_sum_exp_x .* exp_x
 end
 
-function _cumsum(x::AbstractVector; B = 5)
-    return 2 .* B .* cumsum(x) .- B 
+function _cumsum(x::AbstractArray, B::Real = 5.)
+    return 2 .* B .* cumsum(x, dims = 1) .- B
 end
 
-function _cumsum(x::AbstractMatrix)
-
-    return cat([_cumsum(i) for i in eachrow(x)]..., dims=2)'
-end
-
-function _cumsum_tri(x::AbstractArray, B::Real = 5.)
-    
-    return 2 .* B .* cumsum(x, dims = 1) .- B 
-end
-
-function _softplus(x::AbstractVector)
-
-    return log.(exp.(x) .+ 1) 
-end
-
-function _softplus(x::AbstractMatrix)
-
-    val = cat([_softplus(i) for i in eachrow(x)]..., dims=2)'
-
-    return val
-end
-
-function _softplus_tri(x::AbstractArray)
-    return log.(exp.(x) .+ 1) 
+function _softplus(x::AbstractArray)
+    return log.(exp.(x) .+ 1)
 end
 
 
