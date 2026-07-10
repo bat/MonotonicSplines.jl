@@ -16,9 +16,11 @@ Whether the gradients of the forward or inverse spline functions are calculated 
 - `tangent_1`, `tangent_2`: Arrays that hold the tangent vectors for the transformed output and the log abs det jacobians respectively.
 
 # Returns
-Three values are returned:
+Four values are returned:
+- `δx`: An array with the same shape as `x`, holding the tangent with respect to `x`, i.e. the
+       `[j,k]`-th element is `tangent_1[j,k] * ∂yⱼₖ/∂xⱼₖ + tangent_2[1,k] * ∂(log(abs(∂yⱼₖ/∂xⱼₖ)))/∂xⱼₖ`.
 - `∂y∂pX + ∂LogJac∂pX`: An array with the same shape as `pY`, with the `[:,j,k]`-th element holding the gradient of the `[j,k]`-th element of `y` with respect to the width parameters
-                      plus the gradient of the logarithm of the absolute value of the derivative of this `[j,k]`-th element of `y` with respect to the `[j,k]`-th element of `x`, with respect to the width parameters. 
+                      plus the gradient of the logarithm of the absolute value of the derivative of this `[j,k]`-th element of `y` with respect to the `[j,k]`-th element of `x`, with respect to the width parameters.
                       For Example, the `[i,j,k]` element of this array is `∂yⱼₖ/∂pXᵢⱼₖ + ∂(log(abs(∂yⱼₖ/∂xⱼₖ)))/∂pXᵢⱼₖ`.
 - `∂y∂pY + ∂LogJac∂pY`: An array with the same shape as `pY`, holding the same gradients as described above, but with respect to the height parameters.
 - `∂y∂dYdX + ∂LogJac∂dYdX`: An array with the same shape as `dYdX`, holding the same gradients as described above, but with respect to the derivative parameters.
@@ -45,10 +47,11 @@ function rqs_pullback(
 
     y = similar(x)
     logJac = similar(x)
+    δx = similar(x)
 
     ∂y∂pX = fill!(similar(pX), zero(eltype(pX)))
-    ∂y∂dYdX = fill!(similar(pY), zero(eltype(pY)))
-    ∂y∂pY = fill!(similar(dYdX), zero(eltype(dYdX)))
+    ∂y∂pY = fill!(similar(pY), zero(eltype(pY)))
+    ∂y∂dYdX = fill!(similar(dYdX), zero(eltype(dYdX)))
 
     ∂LogJac∂pX = fill!(similar(pX), zero(eltype(pX)))
     ∂LogJac∂pY = fill!(similar(pY), zero(eltype(pY)))
@@ -56,18 +59,16 @@ function rqs_pullback(
 
     kernel!(
         param_eval_function,
-        x, y, logJac, 
+        x, y, logJac, δx,
         pX, pY, dYdX,
         ∂y∂pX, ∂y∂pY, ∂y∂dYdX,
-        ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX, 
+        ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX,
         tangent_1,
         tangent_2,
         ndrange=size(x)
         )
 
-    logJac = sum(logJac, dims=1)
-
-    return ∂y∂pX + ∂LogJac∂pX, ∂y∂pY + ∂LogJac∂pY, ∂y∂dYdX + ∂LogJac∂dYdX
+    return δx, ∂y∂pX + ∂LogJac∂pX, ∂y∂pY + ∂LogJac∂pY, ∂y∂dYdX + ∂LogJac∂dYdX
 end
 
 
@@ -78,6 +79,7 @@ end
         x::AbstractArray,
         y::AbstractArray,
         logJac::AbstractArray,
+        δx::AbstractArray,
         pXw::AbstractArray,
         pY::AbstractArray,
         dYdX::AbstractArray,
@@ -99,6 +101,7 @@ This kernel function calculates the gradients of the rational quadratic spline f
 - `pX`, `pY`, `dYdX`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively.
 - `y`: An array where the transformed values are stored.
 - `logJac`: An array where the sums of the values of the logarithm of the absolute values of the determinant of the Jacobians of the spline functions applied to a column of `x` are stored.
+- `δx`: An array where the tangent with respect to `x` is stored.
 - `∂y∂pX_tangent`, `∂y∂pY_tangent`, `∂y∂dYdX_tangent`: Arrays that will contain the gradients of the spline functions with respect to `pX`, `pY`, and `dYdX`, respectively.
 - `∂LogJac∂pX_tangent`, `∂LogJac∂pY_tangent`, `∂LogJac∂dYdX_tangent`: Arrays that will contain the gradients of `logJac` with respect to `pX`, `pY`, and `dYdX`, respectively.
 - `tangent_1`, `tangent_2`: Arrays that hold the tangent vectors for the forward pass.
@@ -113,6 +116,7 @@ This function is a kernel function and is used within the `rqs_forward_pullback`
         x::AbstractArray{<:Real},
         y::AbstractArray{<:Real},
         LogJac::AbstractArray{<:Real},
+        δx::AbstractArray{<:Real},
         pX::AbstractArray{<:Real},
         pY::AbstractArray{<:Real},
         dYdX::AbstractArray{<:Real},
@@ -143,10 +147,14 @@ This function is a kernel function and is used within the `rqs_forward_pullback`
 
     x_tmp = Base.ifelse(isinside, x[i,j], pX[k,i,j]) # Simplifies calculations
 
-    (yᵢⱼ, LogJacᵢⱼ, ∂y∂pX, ∂y∂pY, ∂y∂dYdX, ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX) = param_eval_function(pX[k,i,j], pX[k+1,i,j], pY[k,i,j], pY[k+1,i,j], dYdX[k,i,j], dYdX[k+1,i,j], x_tmp)
+    (yᵢⱼ, LogJacᵢⱼ, ∂y∂pX, ∂y∂pY, ∂y∂dYdX, ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX, ∂LogJac∂x) = param_eval_function(pX[k,i,j], pX[k+1,i,j], pY[k,i,j], pY[k+1,i,j], dYdX[k,i,j], dYdX[k+1,i,j], x_tmp)
 
-    y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
+    y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j])
     LogJac[i,j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
+
+    # Outside the spline range the transformation is the identity
+    ∂y∂x = Base.ifelse(isinside, exp(LogJacᵢⱼ), one(LogJacᵢⱼ))
+    δx[i,j] = tangent_1[i,j] * ∂y∂x + tangent_2[1,j] * Base.ifelse(isinside, ∂LogJac∂x, zero(∂LogJac∂x))
 
     ∂y∂pX_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂pX[1], zero(eltype(∂y∂pX)))
     ∂y∂pY_tangent[k, i, j]      = tangent_1[i,j] * Base.ifelse(isinside, ∂y∂pY[1], zero(eltype(∂y∂pY)))
@@ -239,6 +247,11 @@ function eval_forward_rqs_params_with_grad(
     ∂y∂dYdXₖ₊₁ = -(nom_2/denom^2) * ξ*(1-ξ)
     ∂LogJac∂dYdXₖ₊₁ = (1/nom_4)*sk^2*ξ^2 - (2/denom)*ξ*(1-ξ)
 
+    # dLogJac / dx
+    ∂nom_3∂ξ = 2*(dYdXₖ₊₁*ξ + sk*(1-2*ξ) - dYdXₖ*(1-ξ))
+    ∂denom∂ξ = (dYdXₖ₊₁ + dYdXₖ - 2*sk)*(1-2*ξ)
+    ∂LogJac∂x = (∂nom_3∂ξ/nom_3 - 2*∂denom∂ξ/denom)/Δx
+
     ∂y∂pX = (∂y∂pXₖ, ∂y∂pXₖ₊₁)
     ∂y∂pY = (∂y∂pYₖ, ∂y∂pYₖ₊₁)
     ∂y∂dYdX = (∂y∂dYdXₖ, ∂y∂dYdXₖ₊₁)
@@ -247,7 +260,7 @@ function eval_forward_rqs_params_with_grad(
     ∂LogJac∂pY = (∂LogJac∂pYₖ, ∂LogJac∂pYₖ₊₁)
     ∂LogJac∂dYdX = (∂LogJac∂dYdXₖ, ∂LogJac∂dYdXₖ₊₁)
 
-    return y, logJac, ∂y∂pX, ∂y∂pY, ∂y∂dYdX, ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX
+    return y, logJac, ∂y∂pX, ∂y∂pY, ∂y∂dYdX, ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX, ∂LogJac∂x
 end
 
 
@@ -365,6 +378,11 @@ function eval_inverse_rqs_params_with_grad(
     # LogJacobian, logaritm of the absolute value of ∂y/∂x
     LogJac = log(abs(μ)) - 2*log(abs(β + θ))
 
+    # dLogJac / dx
+    ∂θ∂x∂x = ((∂β∂x)^2 - 4*∂κ∂x*∂ζ∂x - (∂θ∂x)^2) / θ
+    ∂μ∂x = -2 * Δx * ζ * ∂θ∂x∂x
+    ∂LogJac∂x = ∂μ∂x/μ - 2*(∂β∂x + ∂θ∂x)/(β + θ)
+
     ∂y∂pX = (∂y∂pXₖ, ∂y∂pXₖ₊₁)
     ∂y∂pY = (∂y∂pYₖ, ∂y∂pYₖ₊₁)
     ∂y∂dYdX = (∂y∂dYdXₖ, ∂y∂dYdXₖ₊₁)
@@ -373,5 +391,5 @@ function eval_inverse_rqs_params_with_grad(
     ∂LogJac∂pY = (∂LogJac∂pYₖ, ∂LogJac∂pYₖ₊₁)
     ∂LogJac∂dYdX = (∂LogJac∂dYdXₖ, ∂LogJac∂dYdXₖ₊₁)
 
-    return y, LogJac, ∂y∂pX, ∂y∂pY, ∂y∂dYdX, ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX
+    return y, LogJac, ∂y∂pX, ∂y∂pY, ∂y∂dYdX, ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX, ∂LogJac∂x
 end

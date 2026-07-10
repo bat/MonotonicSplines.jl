@@ -7,7 +7,7 @@ using MonotonicSplines: rqs_forward, rqs_inverse, rqs_pullback
 using MonotonicSplines: eval_forward_rqs_params_with_grad, eval_inverse_rqs_params_with_grad
 
 import ChainRulesCore
-using ChainRulesCore: @thunk, AbstractZero, NoTangent, unthunk
+using ChainRulesCore: AbstractZero, NoTangent, unthunk
 
 using Adapt: adapt
 using HeterogeneousComputing: get_compute_unit
@@ -28,11 +28,8 @@ function ChainRulesCore.rrule(
         δY = adapt(compute_unit, maybe_δY isa AbstractZero ? zero(y) : maybe_δY)
         δlogJac = adapt(compute_unit, maybe_δlogJac isa AbstractZero ? zero(logJac) : maybe_δlogJac)
 
-        (
-            NoTangent(),
-            @thunk(tangent[1] .* exp.(logJac)),
-            rqs_pullback(eval_forward_rqs_params_with_grad, x, pX, pY, dYdX, δY, δlogJac)...
-        )
+        δx, δpX, δpY, δdYdX = rqs_pullback(eval_forward_rqs_params_with_grad, x, pX, pY, dYdX, δY, δlogJac)
+        (NoTangent(), δx, δpX, δpY, δdYdX)
     end
 
     return (y, logJac), rqs_forward_pullback
@@ -54,11 +51,8 @@ function ChainRulesCore.rrule(
         δY = adapt(compute_unit, maybe_δY isa AbstractZero ? zero(y) : maybe_δY)
         δlogJac = adapt(compute_unit, maybe_δlogJac isa AbstractZero ? zero(logJac) : maybe_δlogJac)
 
-        (
-            NoTangent(),
-            @thunk(tangent[1] .* exp.(logJac)),
-            rqs_pullback(eval_inverse_rqs_params_with_grad, x, pX, pY, dYdX, δY, δlogJac)...
-        )
+        δx, δpX, δpY, δdYdX = rqs_pullback(eval_inverse_rqs_params_with_grad, x, pX, pY, dYdX, δY, δlogJac)
+        (NoTangent(), δx, δpX, δpY, δdYdX)
     end
 
     return (y, logJac), rqs_inverse_pullback

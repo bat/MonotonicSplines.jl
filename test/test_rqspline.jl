@@ -76,10 +76,12 @@ for compute_unit in compute_units
         @test length((map(unthunk, rrule(rqs_forward, x_test, RQS_test.pX, RQS_test.pY, RQS_test.dYdX)[2]((ZeroTangent(), ladj_forward_test))))) == 5
         @test length((map(unthunk, rrule(rqs_inverse, y_test, RQS_inv_test.pX, RQS_inv_test.pY, RQS_inv_test.dYdX)[2]((ZeroTangent(), ladj_inverse_test))))) == 5
 
+        @test Zygote.gradient(sum ∘ RQS_test, x_test)[1] ≈ exp.(ladj_forward_test)
         @test Zygote.gradient(sum ∘ RQS_test, x_test) isa Tuple{AbstractArray}
         @test Zygote.gradient((f, x) -> sum(f(x)), RQS_test, x_test) isa Tuple{NamedTuple, AbstractArray}
         @test Zygote.gradient((f, x) -> sum(map(sum, with_logabsdet_jacobian(f, x))), RQS_test, x_test) isa Tuple{NamedTuple, AbstractArray}
 
+        @test Zygote.gradient(sum ∘ RQS_inv_test, y_test)[1] ≈ exp.(ladj_inverse_test)
         @test Zygote.gradient(sum ∘ RQS_inv_test, y_test) isa Tuple{AbstractArray}
         @test Zygote.gradient((f, x) -> sum(f(x)), RQS_inv_test, y_test) isa Tuple{NamedTuple, AbstractArray}
         @test Zygote.gradient((f, x) -> sum(map(sum, with_logabsdet_jacobian(f, x))), RQS_inv_test, y_test) isa Tuple{NamedTuple, AbstractArray}
