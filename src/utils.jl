@@ -58,7 +58,7 @@ dYdX = MonotonicSplines.estimate_dYdX(pX, pY)
 f = RQSpline(pX, pY, dYdX)
 ```
 
-When an RQSpline is intended to be used beyong the first and last knot, the
+When an RQSpline is intended to be used beyond the first and last knot, the
 first and last derivative should be one, so in that case use
 
 ```julia
@@ -84,7 +84,7 @@ Process the raw output parameters of a neural network to generate parameters for
 # Arguments
 - `θ_raw`: A matrix where each column represents the raw parameters for a sample.
 - `n_dims_trafo`: The number of spline functions for which parameters are to be produced.
-- `B`: Sets the rage of the splines.
+- `B`: Sets the range of the splines.
 
 # Returns
 - A tuple `pX, pY, dYdX` containing the positions of and derivatives at the spline knots.

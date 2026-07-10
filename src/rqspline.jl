@@ -1,4 +1,4 @@
-# This file is a part of EuclidianNormalizingFlows.jl, licensed under the MIT License (MIT).
+# This file is a part of MonotonicSplines.jl, licensed under the MIT License (MIT).
 
 """
     struct RQSpline{T<:Real,N,...} <: Function
@@ -50,7 +50,7 @@ Example:
 ```
 using MonotonicSplines
 
-f = RQSpline(posX, posX, dY_dX)
+f = RQSpline(pX, pY, dYdX)
 Y = f(X)
 
 using InverseFunctions: inverse
@@ -62,7 +62,7 @@ Y, LADJ = with_logabsdet_jacobian(f, X)
 
 When instantiated as a set of multi-dimension/samples splines, `RQSpline` uses
 the package KernelAbstractions for parallel CPU or GPU processing. Custom
-`ChainRulesCore` rules are provided for effecient automatic differentation.
+`ChainRulesCore` rules are provided for efficient automatic differentiation.
 
 Random spline generation is supported and RQSpline comes with specialized
 support for Plots:
@@ -159,8 +159,8 @@ end
     MonotonicSplines.rqs_forward(x::Real, pX::AbstractVector{<:Real}, pY::AbstractVector{<:Real}, dYdX::AbstractVector{<:Real})
     MonotonicSplines.rqs_forward(X::AbstractArray{<:Real,2}, pX::AbstractArray{<:Real,3}, pY::AbstractArray{<:Real,3}, dYdX::AbstractArray{<:Real,3})
 
-Apply the rational quadratic spline function(s) defined by the parameters `pX`
-(pX), `pY` (pY), and `dYdX` (dYdX), to the input(s) `X`.
+Apply the rational quadratic spline function(s) defined by the parameters
+`pX`, `pY`, and `dYdX` to the input(s) `x`.
 
 See [`RQSpline`](@ref) for more details.
 """
@@ -289,8 +289,7 @@ end
     MonotonicSplines.rqs_inverse(X::AbstractArray{<:Real,2}, pX::AbstractArray{<:Real,3}, pY::AbstractArray{<:Real,3}, dYdX::AbstractArray{<:Real,3})
 
 Apply the inverse of the rational quadratic spline function(s) defined by the
-parameters `pX` (pX), `pY` (pY), and `dYdX` (dYdX), to the input(s)
-`X`.
+parameters `pX`, `pY`, and `dYdX` to the input(s) `x`.
 
 See [`InvRQSpline`](@ref) for more details.
 """
