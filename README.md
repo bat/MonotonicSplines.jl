@@ -70,7 +70,7 @@ f_{\theta_{D}}(x_{D})   \\
 = \mathbf{y}
 \end{align*}
 ```
-Here $`f_{\theta_j} : \mathbb{R} \rightarrow \mathbb{R} ~~ (j = d,...,D)~`$  denotes a single spline function, characterized by the parameters $`~\theta_{j} = (\text{pX}_j~, ~\text{heigths}_j~,~\text{dYdX}_j)`$ in the case of the rational quadratic spline functions defined in ["Neural Spline Flows, Durkan et al. 2019"](https://arxiv.org/abs/1906.04032). 
+Here $`f_{\theta_j} : \mathbb{R} \rightarrow \mathbb{R} ~~ (j = d,...,D)~`$  denotes a single spline function, characterized by the parameters $`~\theta_{j} = (\text{pX}_j~, ~\text{pY}_j~,~\text{dYdX}_j)`$ in the case of the rational quadratic spline functions defined in ["Neural Spline Flows, Durkan et al. 2019"](https://arxiv.org/abs/1906.04032). 
 
 Consider a single sample $`\mathbf{x}_i \in \mathbb{R}^D`$ from our sample set. 
 

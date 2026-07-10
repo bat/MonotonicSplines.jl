@@ -3,11 +3,11 @@
 
 This page provides a summarized explanation of the implementation of the rational quadratic spline functions as defined in [^1]. For a comprehensive derivation and explanation of the spline function's usage, see [^1] and [^2].
 
-Rational quadratic functions are defined as the quotient of two quadratic polynomials and offer superior flexibility to other function families [^1]. They are easily differentiable, and since they are constructed to be monotonous, they also are analytically invertible. 
+Rational quadratic functions are defined as the quotient of two quadratic polynomials and offer superior flexibility to other function families [^1]. They are easily differentiable, and since they are constructed to be monotonic, they also are analytically invertible. 
 
-Durkan et al. construct their rational quadratic splines ``f`` from ``K`` different rational quadratic functions. The parameterization of the splines follows the method of Gregory and Delbourgo [^3]. They characterize a spline by the coordinates ``\{(x_k,y_k)\},  k = 1, ..., K+1``, of the ``K+1`` points called \textit{knots} in which two adjacent spline segments are joined together. The parameterization also incorporates the ``K-1`` derivatives of the spline at the interior knots. 
+Durkan et al. construct their rational quadratic splines ``f`` from ``K`` different rational quadratic functions. The parameterization of the splines follows the method of Gregory and Delbourgo [^3]. They characterize a spline by the coordinates ``\{(x_k,y_k)\},  k = 1, ..., K+1``, of the ``K+1`` points called *knots* in which two adjacent spline segments are joined together. The parameterization also incorporates the ``K-1`` derivatives of the spline at the interior knots. 
 
-limit the number of parameters needed to characterize a spline, they are defined on a finite interval
+To limit the number of parameters needed to characterize a spline, they are defined on a finite interval
 ```math
 
     f : [-B, B] \rightarrow [-B, B] , ~ \text{with}~ B \in \mathbb{R}.
@@ -25,23 +25,20 @@ In the ``k``-th bin (``1\leq k \leq K``), the respective spline segment ``f_k`` 
 ```
 The spline function ``f`` is then defined piece-wise from the segment functions within each bin. The segments of the inverse spline function ``f^{-1}`` are given by:
 ```math
-    f_k^{-1} : [y_k, y_{k+1}) \rightarrow [-B,B], ~y \mapsto x_k + \frac{(x_{k+1}-x_{k})[s_k'(\xi')^2+\delta_k\xi'(1-\xi')]}{s_k'+[\delta_{k+1}+\delta_k-2s_k']\xi'(1-\xi')}
+    f_k^{-1} : [y_k, y_{k+1}) \rightarrow [x_k, x_{k+1}), ~y \mapsto x_k + (x_{k+1}-x_{k})\,\xi'(y)
 ```
 where
-```math
-    s_k' = s_k'(y)= \frac{x_{k+1} - y_k}{y_{k+1}-y}
-```
 ```math
     \xi' = \xi'(y) = \frac{2c}{-b-\sqrt{b^2-4ac}}
 ```
 ```math
-    a = a(y) = (y_{k+1} - y_k)(s_k' - \delta_k) + (y-y_k)(\delta_{k+1}+\delta_k-2s_k')
+    a = a(y) = (y_{k+1} - y_k)(s_k - \delta_k) + (y-y_k)(\delta_{k+1}+\delta_k-2s_k)
 ```
 ```math
-    b = b(y) = (y_{k+1}-y_k)\delta_k-(y-y_k)(\delta_{k+1}+\delta_k-2s_k')\\[7pt]
+    b = b(y) = (y_{k+1}-y_k)\delta_k-(y-y_k)(\delta_{k+1}+\delta_k-2s_k)\\[7pt]
 ```
 ```math
-    c = c(y) = -s_k'(y-y_k)
+    c = c(y) = -s_k(y-y_k)
 ```
 The derivative for these functions can also be calculated analytically and are given by:
 ```math
@@ -53,7 +50,7 @@ The derivative for these functions can also be calculated analytically and are g
 
 Inside the ``[-B, B] \times [-B, B]`` interval mask, the spline is characterized by the knots it passes through, as described above. Outside of this mask, ``f`` is set to be the identity function ``\text{id} : \mathbb{R} \rightarrow \mathbb{R},~ x \mapsto x``, to allow ``f`` to act on boundless input while retaining a finite number of parameters. 
 
-The outermost knots are set to be at the interval edges ``(x_1,y_1)\equiv(-B,-B), ~ (x_K,y_K)\equiv(B,B)`` and the corresponding derivatives are set to be ``1`` to match the derivative of the identity function. Durkan et al. found this to improve the numerical stability of the Flow during training[^1]. 
+The outermost knots are set to be at the interval edges ``(x_1,y_1)\equiv(-B,-B), ~ (x_{K+1},y_{K+1})\equiv(B,B)`` and the corresponding derivatives are set to be ``1`` to match the derivative of the identity function. Durkan et al. found this to improve the numerical stability of the Flow during training[^1]. 
 
 With this construction, ``3(K - 1)`` parameters are needed to fully characterize a spline function ``f`` : ``K + 1`` sets of ``x_k`` and ``y_k`` coordinates for the knots, plus ``K + 1`` derivatives ``\delta_k`` minus the two fixed sets of coordinates and derivatives for the boundary knots.
 
