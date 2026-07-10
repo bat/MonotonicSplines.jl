@@ -176,7 +176,7 @@ function rqs_forward(
     K = size(pX, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(view(pX, :), x) - 1
+    k1 = searchsortedfirst_impl(pX, x) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
@@ -304,7 +304,7 @@ function rqs_inverse(
     K = size(pX, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(view(pY, :), x) - 1
+    k1 = searchsortedfirst_impl(pY, x) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range

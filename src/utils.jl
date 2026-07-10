@@ -199,17 +199,17 @@ midpoint(lo::T, hi::T) where T<:Integer = lo + ((hi - lo) >>> 0x01)
 binary_log(x::T) where {T<:Integer} = 8 * sizeof(T) - leading_zeros(x - 1)
 
 function searchsortedfirst_impl(
-        v::AbstractVector, 
+        v::AbstractVector,
         x::Real
     )
-    
-    u = one(Integer)
-    lo = one(Integer) - u
+
+    u = 1
+    lo = 0
     hi = length(v) + u
-    
+
     n = binary_log(length(v))+1
-    m = one(Integer)
-    
+    m = 1
+
     @inbounds for i in 1:n
         m_1 = midpoint(lo, hi)
         m = Base.ifelse(lo < hi - u, m_1, m)
