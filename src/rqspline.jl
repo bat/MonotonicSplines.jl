@@ -1,7 +1,7 @@
 # This file is a part of MonotonicSplines.jl, licensed under the MIT License (MIT).
 
 """
-    struct RQSpline{T<:Real,N,...} <: Function
+    struct RQSpline{T,N,...} <: Function
 
 Represents a rational quadratic spline function or a set of such functions for
 multiple dimensions and samples.
@@ -75,7 +75,7 @@ plot(f, xlims = (-6, 6)); plot!(inverse(f), xlims = (-6, 6))
 ```
 """
 struct RQSpline{
-    T<:Real, N,
+    T, N,
     TX<:AbstractArray{T,N}, TY<:AbstractArray{T,N}, TD<:AbstractArray{T,N}
 } <: Function
     pX::TX
@@ -86,13 +86,13 @@ end
 export RQSpline
 
 (f::RQSpline{<:Any,1})(x::Real) = rqs_forward(x, f.pX, f.pY, f.dYdX)[1]
-(f::RQSpline{<:Any,3})(x::AbstractMatrix{<:Real}) = rqs_forward(x, f.pX, f.pY, f.dYdX)[1]
+(f::RQSpline{<:Any,3})(x::AbstractMatrix) = rqs_forward(x, f.pX, f.pY, f.dYdX)[1]
 
 function ChangesOfVariables.with_logabsdet_jacobian(f::RQSpline{<:Any,1}, x::Real)
     return rqs_forward(x, f.pX, f.pY, f.dYdX)
 end
 
-function ChangesOfVariables.with_logabsdet_jacobian(f::RQSpline{<:Any,3}, x::AbstractMatrix{<:Real} )
+function ChangesOfVariables.with_logabsdet_jacobian(f::RQSpline{<:Any,3}, x::AbstractMatrix)
     return rqs_forward(x, f.pX, f.pY, f.dYdX)
 end
 
@@ -121,7 +121,7 @@ end
 
 
 """
-  struct InvRQSpline{T<:Real,N,...} <: Function
+  struct InvRQSpline{T,N,...} <: Function
 
 Represents the inverse of [`RQSpline`](@ref).
 
@@ -132,7 +132,7 @@ Users should not instantiate `InvRQSpline` directly, use
 `InverseFunctions.inverse(RQSpline(...))` instead.
 """
 struct InvRQSpline{
-    T<:Real, N,
+    T, N,
     TX<:AbstractArray{T,N}, TY<:AbstractArray{T,N}, TD<:AbstractArray{T,N}
 } <: Function
     pX::TX
@@ -143,13 +143,13 @@ end
 export InvRQSpline
 
 (f::InvRQSpline{<:Any,1})(x::Real) = rqs_inverse(x, f.pX, f.pY, f.dYdX)[1]
-(f::InvRQSpline{<:Any,3})(x::AbstractMatrix{<:Real}) = rqs_inverse(x, f.pX, f.pY, f.dYdX)[1]
+(f::InvRQSpline{<:Any,3})(x::AbstractMatrix) = rqs_inverse(x, f.pX, f.pY, f.dYdX)[1]
 
 function ChangesOfVariables.with_logabsdet_jacobian(f::InvRQSpline{<:Any,1}, x::Real)
     return rqs_inverse(x, f.pX, f.pY, f.dYdX)
 end
 
-function ChangesOfVariables.with_logabsdet_jacobian(f::InvRQSpline{<:Any,3}, x::AbstractMatrix{<:Real} )
+function ChangesOfVariables.with_logabsdet_jacobian(f::InvRQSpline{<:Any,3}, x::AbstractMatrix)
     return rqs_inverse(x, f.pX, f.pY, f.dYdX)
 end
 

@@ -22,6 +22,7 @@ using HeterogeneousComputing: ka_backend
 using KernelAbstractions
 
 include("rqspline.jl")
+include("rqspline_purearray.jl")
 include("rqspline_pullbacks.jl")
 include("utils.jl")
 
