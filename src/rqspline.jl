@@ -64,8 +64,8 @@ When instantiated as a set of multi-dimension/samples splines, `RQSpline` uses
 the package KernelAbstractions for parallel CPU or GPU processing. Custom
 `ChainRulesCore` rules are provided for efficient automatic differentiation.
 
-Random spline generation is supported and RQSpline comes with specialized
-support for Plots:
+Random spline generation is supported and RQSpline comes with plotting
+recipes for both Plots and Makie:
 
 ```julia
 using MonotonicSplines, Plots, InverseFunctions

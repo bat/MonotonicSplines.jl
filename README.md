@@ -16,6 +16,8 @@ resp. parameter transformations in general.
 
 This package currently includes the *monotonic rational quadratic splines* defined in ["Neural Spline Flows, Durkan et al. 2019"](https://arxiv.org/abs/1906.04032).
 
+Automatic differentiation is supported via ChainRulesCore (e.g. Zygote), Mooncake, Enzyme and Reactant. Plotting is supported via both RecipesBase (e.g. Plots) and Makie.
+
 Please see the Documentation linked below for details.
 
 ## Documentation
