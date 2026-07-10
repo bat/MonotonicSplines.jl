@@ -7,13 +7,10 @@ import MonotonicSplines: RQSpline, InvRQSpline
 
 const _SingleRQSpline = Union{RQSpline{<:Any,1}, InvRQSpline{<:Any,1}}
 
-Makie.@recipe(RQSplinePlot, spline) do scene
-    l_theme = Makie.default_theme(scene, Makie.Lines)
-    Makie.Attributes(
-        color = l_theme.color,
-        npoints = 200,
-        cycle = [:color],
-    )
+Makie.@recipe RQSplinePlot (spline,) begin
+    color = @inherit linecolor
+    npoints = 200
+    cycle = [:color]
 end
 
 Makie.plottype(::_SingleRQSpline) = RQSplinePlot
