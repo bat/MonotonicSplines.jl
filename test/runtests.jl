@@ -8,5 +8,5 @@ Test.@testset "Package MonotonicSplines" begin
     include("test_rqspline.jl")
     include("test_rqspline_pullbacks.jl")
     include("test_docs.jl")
-    isempty(Test.detect_ambiguities(MonotonicSplines))
+    Test.@test isempty(Test.detect_ambiguities(MonotonicSplines))
 end # testset

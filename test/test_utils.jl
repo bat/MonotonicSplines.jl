@@ -64,6 +64,12 @@ end
     output_sorted = hcat(fill(0.1,10), fill(2,10), fill(3,10), fill(0.4,10), fill(5, 10), fill(0.6,10))'
     test_array_2_search = collect(1:10)
 
+    output_sorted_2 = hcat(fill(1,10), fill(0.1,10), fill(3,10), fill(0.4,10), fill(5, 10), fill(0.6,10))'
+
     @test MonotonicSplines._sort_dimensions(test_y1, test_y2, [true, false, false, true, false, true]) == output_sorted
+    @test MonotonicSplines._sort_dimensions(test_y1, test_y2, [false, true, false, true, false, true]) == output_sorted_2
     @test MonotonicSplines.searchsortedfirst_impl(test_array_2_search, 4.5) == 5
+    @test MonotonicSplines.searchsortedfirst_impl(test_array_2_search, 0.5) == 1
+    @test MonotonicSplines.searchsortedfirst_impl(test_array_2_search, 11) == 11
+    @test MonotonicSplines.searchsortedfirst_impl(test_array_2_search, 4) == 4
 end

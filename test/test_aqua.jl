@@ -7,7 +7,6 @@ import MonotonicSplines
 Test.@testset "Aqua tests" begin
     Aqua.test_all(
         MonotonicSplines,
-        ambiguities = false,
-        piracies = false
+        ambiguities = false
     )
 end # testset

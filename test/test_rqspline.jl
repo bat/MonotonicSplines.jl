@@ -125,6 +125,23 @@ for compute_unit in compute_units
         @test all(isapprox.(MonotonicSplines.rqs_inverse(y_test, pX, pY, dYdX), (x_test, ladj_inverse_test)))
     end
 
+    @testset "identity_outside_range_$compute_unit_type" begin
+        local x_out = adapt(compute_unit, [-7.0 6.0 8.5 -9.0 5.5 -5.5 7.7 -6.6 9.9 -8.8])
+        for f in (RQSpline(pX, pY, dYdX), InvRQSpline(pX, pY, dYdX))
+            @test f(x_out) == x_out
+            local y_ladj = ChangesOfVariables.with_logabsdet_jacobian(f, x_out)
+            @test y_ladj[1] == x_out && all(iszero, y_ladj[2])
+        end
+
+        if compute_unit isa CPUnit
+            local f1 = RQS_test1D
+            local inv_f1 = RQS_inv_test1D
+            @test f1(7.5) == 7.5 && inv_f1(7.5) == 7.5
+            @test ChangesOfVariables.with_logabsdet_jacobian(f1, -6.2) == (-6.2, 0.0)
+            @test ChangesOfVariables.with_logabsdet_jacobian(inv_f1, -6.2) == (-6.2, 0.0)
+        end
+    end
+
     @testset "rqs_kernels_$compute_unit_type" begin
         forward_kernel_test = MonotonicSplines.rqs_forward_kernel!(CPU(), 4)
         y_kernel_test = zeros(size(x_test)...)
@@ -149,12 +166,17 @@ for compute_unit in compute_units
         end
 
         @testset "plotting" begin
-            Plots.plot(RQS_test1D) isa Plots.Plot
-            Plots.plot(RQS_test1D, seriescolor = :green, xlims = (-6, 6)) isa Plots.Plot
-            Plots.plot(RQS_test1D, linecolor = :green, xlims = (-6, 6)) isa Plots.Plot
-            Plots.plot!(RQS_inv_test1D) isa Plots.Plot
-            Plots.plot!(RQS_inv_test1D, seriescolor = :green, xlims = (-6, 6)) isa Plots.Plot
-            Plots.plot!(RQS_inv_test1D, linecolor = :green, xlims = (-6, 6)) isa Plots.Plot
+            @test Plots.plot(RQS_test1D) isa Plots.Plot
+            @test Plots.plot(RQS_test1D, seriescolor = :green, xlims = (-6, 6)) isa Plots.Plot
+            @test Plots.plot(RQS_test1D, linecolor = :green, xlims = (-6, 6)) isa Plots.Plot
+            @test Plots.plot!(RQS_inv_test1D) isa Plots.Plot
+            @test Plots.plot!(RQS_inv_test1D, seriescolor = :green, xlims = (-6, 6)) isa Plots.Plot
+            @test Plots.plot!(RQS_inv_test1D, linecolor = :green, xlims = (-6, 6)) isa Plots.Plot
+
+            pl_colors = collect(Plots.palette(:auto))
+            plt = Plots.plot([0, 1], [0, 1], seriescolor = first(pl_colors))
+            @test Plots.plot!(plt, RQS_test1D) isa Plots.Plot
+            @test oftype(pl_colors[2], plt.series_list[end][:linecolor]) ≈ pl_colors[2]
         end
     end
 end
