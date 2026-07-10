@@ -166,17 +166,26 @@ for compute_unit in compute_units
         end
 
         @testset "plotting" begin
-            @test Plots.plot(RQS_test1D) isa Plots.Plot
-            @test Plots.plot(RQS_test1D, seriescolor = :green, xlims = (-6, 6)) isa Plots.Plot
-            @test Plots.plot(RQS_test1D, linecolor = :green, xlims = (-6, 6)) isa Plots.Plot
-            @test Plots.plot!(RQS_inv_test1D) isa Plots.Plot
-            @test Plots.plot!(RQS_inv_test1D, seriescolor = :green, xlims = (-6, 6)) isa Plots.Plot
-            @test Plots.plot!(RQS_inv_test1D, linecolor = :green, xlims = (-6, 6)) isa Plots.Plot
+            @test Base.get_extension(MonotonicSplines, :MonotonicSplinesRecipesBaseExt) isa Module
 
             pl_colors = collect(Plots.palette(:auto))
-            plt = Plots.plot([0, 1], [0, 1], seriescolor = first(pl_colors))
-            @test Plots.plot!(plt, RQS_test1D) isa Plots.Plot
-            @test oftype(pl_colors[2], plt.series_list[end][:linecolor]) ≈ pl_colors[2]
+
+            plt = Plots.plot(RQS_test1D)
+            @test plt isa Plots.Plot
+            @test length(plt.series_list) == 2
+            @test plt.series_list[2][:seriestype] == :scatter
+            @test oftype(pl_colors[1], plt.series_list[1][:linecolor]) ≈ pl_colors[1]
+            @test oftype(pl_colors[1], plt.series_list[2][:markercolor]) ≈ pl_colors[1]
+
+            @test Plots.plot!(plt, RQS_inv_test1D) isa Plots.Plot
+            @test length(plt.series_list) == 4
+            @test oftype(pl_colors[2], plt.series_list[3][:linecolor]) ≈ pl_colors[2]
+            @test oftype(pl_colors[2], plt.series_list[4][:markercolor]) ≈ pl_colors[2]
+
+            plt2 = Plots.plot(RQS_test1D, seriescolor = :green, xlims = (-6, 6))
+            @test plt2 isa Plots.Plot
+            @test plt2.series_list[1][:linecolor] == plt2.series_list[2][:markercolor]
+            @test Plots.plot(RQS_test1D, linecolor = :green, xlims = (-6, 6)) isa Plots.Plot
         end
     end
 end
