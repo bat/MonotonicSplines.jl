@@ -4,7 +4,7 @@ module MonotonicSplinesChainRulesCoreExt
 
 using MonotonicSplines
 using MonotonicSplines: rqs_forward, rqs_inverse, rqs_pullback
-using MonotonicSplines: eval_forward_rqs_params_with_grad, eval_inverse_rqs_params_with_grad
+using MonotonicSplines: RQSForward, RQSInverse
 
 import ChainRulesCore
 using ChainRulesCore: AbstractZero, NoTangent, unthunk
@@ -28,7 +28,7 @@ function ChainRulesCore.rrule(
         δY = adapt(compute_unit, maybe_δY isa AbstractZero ? zero(y) : maybe_δY)
         δlogJac = adapt(compute_unit, maybe_δlogJac isa AbstractZero ? zero(logJac) : maybe_δlogJac)
 
-        δx, δpX, δpY, δdYdX = rqs_pullback(eval_forward_rqs_params_with_grad, x, pX, pY, dYdX, δY, δlogJac)
+        δx, δpX, δpY, δdYdX = rqs_pullback(RQSForward(), x, pX, pY, dYdX, δY, δlogJac)
         (NoTangent(), δx, δpX, δpY, δdYdX)
     end
 
@@ -51,7 +51,7 @@ function ChainRulesCore.rrule(
         δY = adapt(compute_unit, maybe_δY isa AbstractZero ? zero(y) : maybe_δY)
         δlogJac = adapt(compute_unit, maybe_δlogJac isa AbstractZero ? zero(logJac) : maybe_δlogJac)
 
-        δx, δpX, δpY, δdYdX = rqs_pullback(eval_inverse_rqs_params_with_grad, x, pX, pY, dYdX, δY, δlogJac)
+        δx, δpX, δpY, δdYdX = rqs_pullback(RQSInverse(), x, pX, pY, dYdX, δY, δlogJac)
         (NoTangent(), δx, δpX, δpY, δdYdX)
     end
 

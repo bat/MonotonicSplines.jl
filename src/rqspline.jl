@@ -155,6 +155,28 @@ end
 
 
 
+# Non-public:
+#=
+    RQSForward
+    RQSInverse
+
+Singleton types that select the direction in which rational quadratic
+splines are applied. The bin search runs over the x-knots in the forward
+and over the y-knots in the inverse direction.
+=#
+struct RQSForward end
+struct RQSInverse end
+
+_rqs_eval_params(::RQSForward, args...) = eval_forward_rqs_params(args...)
+_rqs_eval_params(::RQSInverse, args...) = eval_inverse_rqs_params(args...)
+
+_rqs_eval_params_with_grad(::RQSForward, args...) = eval_forward_rqs_params_with_grad(args...)
+_rqs_eval_params_with_grad(::RQSInverse, args...) = eval_inverse_rqs_params_with_grad(args...)
+
+_rqs_search_knots(::RQSForward, pX, pY) = pX
+_rqs_search_knots(::RQSInverse, pX, pY) = pY
+
+
 """
     MonotonicSplines.rqs_forward(x::Real, pX::AbstractVector{<:Real}, pY::AbstractVector{<:Real}, dYdX::AbstractVector{<:Real})
     MonotonicSplines.rqs_forward(X::AbstractArray{<:Real,2}, pX::AbstractArray{<:Real,3}, pY::AbstractArray{<:Real,3}, dYdX::AbstractArray{<:Real,3})
@@ -164,10 +186,17 @@ Apply the rational quadratic spline function(s) defined by the parameters
 
 See [`RQSpline`](@ref) for more details.
 """
-function rqs_forward end
+rqs_forward(x, pX, pY, dYdX) = rqs_apply(RQSForward(), x, pX, pY, dYdX)
 
 
-function rqs_forward(
+# Non-public:
+#=
+    rqs_apply(trafo::Union{RQSForward,RQSInverse}, x, pX, pY, dYdX)
+
+Apply rational quadratic spline function(s) in the given direction.
+=#
+function rqs_apply(
+    trafo::Union{RQSForward,RQSInverse},
     x::Real,
     pX::AbstractVector{<:Real},
     pY::AbstractVector{<:Real},
@@ -176,7 +205,7 @@ function rqs_forward(
     K = size(pX, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(pX, x) - 1
+    k1 = searchsortedfirst_impl(_rqs_search_knots(trafo, pX, pY), x) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
@@ -184,16 +213,17 @@ function rqs_forward(
     k = Base.ifelse(isinside, k1, k2)
 
     x_tmp = Base.ifelse(isinside, x, pX[k]) # Simplifies calculations
-    (y_tmp, logJac_tmp) = eval_forward_rqs_params(pX[k], pX[k+1], pY[k], pY[k+1], dYdX[k], dYdX[k+1], x_tmp)
+    (y_tmp, logJac_tmp) = _rqs_eval_params(trafo, pX[k], pX[k+1], pY[k], pY[k+1], dYdX[k], dYdX[k+1], x_tmp)
 
-    y = Base.ifelse(isinside, y_tmp, x) 
+    y = Base.ifelse(isinside, y_tmp, x)
     logJac = Base.ifelse(isinside, logJac_tmp, zero(typeof(logJac_tmp)))
 
     return y, logJac
 end
 
 
-function rqs_forward(
+function rqs_apply(
+    trafo::Union{RQSForward,RQSInverse},
     x::AbstractArray{<:Real,2},
     pX::AbstractArray{<:Real,3},
     pY::AbstractArray{<:Real,3},
@@ -201,12 +231,12 @@ function rqs_forward(
 )
     compute_unit = get_compute_unit(x)
     backend = ka_backend(compute_unit)
-    kernel! = rqs_forward_kernel!(backend, _ka_threads(backend)...)
+    kernel! = rqs_apply_kernel!(backend, _ka_threads(backend)...)
 
     y = similar(x)
     logJac = similar(x)
 
-    kernel!(x, y, logJac, pX, pY, dYdX, ndrange=size(x))
+    kernel!(trafo, x, y, logJac, pX, pY, dYdX, ndrange=size(x))
 
     logJac = sum(logJac, dims=1)
 
@@ -214,7 +244,8 @@ function rqs_forward(
 end
 
 
-@kernel function rqs_forward_kernel!(
+@kernel function rqs_apply_kernel!(
+    trafo::Union{RQSForward,RQSInverse},
     x::AbstractArray{<:Real},
     y::AbstractArray{<:Real},
     logJac::AbstractArray{<:Real},
@@ -227,7 +258,8 @@ end
     K = size(pX, 1) - 1
 
     # Find the bin index
-    k1 = searchsortedfirst_impl(view(pX, :, i, j), x[i,j]) - 1
+    knots = _rqs_search_knots(trafo, pX, pY)
+    k1 = searchsortedfirst_impl(view(knots, :, i, j), x[i,j]) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
@@ -235,9 +267,9 @@ end
     k = Base.ifelse(isinside, k1, k2)
 
     x_tmp = Base.ifelse(isinside, x[i,j], pX[k,i,j]) # Simplifies calculations
-    (yᵢⱼ, LogJacᵢⱼ) = eval_forward_rqs_params(pX[k,i,j], pX[k+1,i,j], pY[k,i,j], pY[k+1,i,j], dYdX[k,i,j], dYdX[k+1,i,j], x_tmp)
+    (yᵢⱼ, LogJacᵢⱼ) = _rqs_eval_params(trafo, pX[k,i,j], pX[k+1,i,j], pY[k,i,j], pY[k+1,i,j], dYdX[k,i,j], dYdX[k+1,i,j], x_tmp)
 
-    y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
+    y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j])
     logJac[i, j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
 end
 
@@ -293,78 +325,7 @@ parameters `pX`, `pY`, and `dYdX` to the input(s) `x`.
 
 See [`InvRQSpline`](@ref) for more details.
 """
-function rqs_inverse end
-
-function rqs_inverse(
-    x::Real,
-    pX::AbstractVector{<:Real},
-    pY::AbstractVector{<:Real},
-    dYdX::AbstractVector{<:Real}
-)
-    K = size(pX, 1) - 1
-
-    # Find the bin index
-    k1 = searchsortedfirst_impl(pY, x) - 1
-    k2 = one(typeof(k1))
-
-    # Is inside of range
-    isinside = (1 <= k1 <= K)
-    k = Base.ifelse(isinside, k1, k2)
-
-    x_tmp = Base.ifelse(isinside, x, pX[k])  # Simplifies unnecessary calculations
-    (y_tmp, logJac_tmp) = eval_inverse_rqs_params(pX[k], pX[k+1], pY[k], pY[k+1], dYdX[k], dYdX[k+1], x_tmp)
-
-    y = Base.ifelse(isinside, y_tmp, x) 
-    logJac = Base.ifelse(isinside, logJac_tmp, zero(typeof(logJac_tmp)))
-
-    return y, logJac
-end
-
-function rqs_inverse(
-        x::AbstractArray{<:Real,2},
-        pX::AbstractArray{<:Real,3},
-        pY::AbstractArray{<:Real,3},
-        dYdX::AbstractArray{<:Real,3}
-    )
-    compute_unit = get_compute_unit(x)
-    backend = ka_backend(compute_unit)
-    kernel! = rqs_inverse_kernel!(backend, _ka_threads(backend)...)
-
-    y = similar(x)
-    logJac = similar(x) 
-    kernel!(x, y, logJac, pX, pY, dYdX, ndrange=size(x))
-    logJac = sum(logJac, dims=1)
-
-    return y, logJac
-end
-
-
-@kernel function rqs_inverse_kernel!(
-        x::AbstractArray{<:Real},
-        y::AbstractArray{<:Real},
-        logJac::AbstractArray{<:Real},
-        pX::AbstractArray{<:Real},
-        pY::AbstractArray{<:Real},
-        dYdX::AbstractArray{<:Real}
-    )
-    i, j = @index(Global, NTuple)
-    
-    K = size(pX, 1) - 1
-
-    # Find the bin index
-    k1 = searchsortedfirst_impl(view(pY, :, i, j), x[i,j]) - 1
-    k2 = one(typeof(k1))
-
-    # Is inside of range
-    isinside = (1 <= k1 <= K)
-    k = Base.ifelse(isinside, k1, k2)
-
-    x_tmp = Base.ifelse(isinside, x[i,j], pX[k,i,j])  # Simplifies unnecessary calculations
-    (yᵢⱼ, LogJacᵢⱼ) = eval_inverse_rqs_params(pX[k,i,j], pX[k+1,i,j], pY[k,i,j], pY[k+1,i,j], dYdX[k,i,j], dYdX[k+1,i,j], x_tmp)
-
-    y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j]) 
-    logJac[i, j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))
-end
+rqs_inverse(x, pX, pY, dYdX) = rqs_apply(RQSInverse(), x, pX, pY, dYdX)
 
 
 #=

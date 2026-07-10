@@ -64,7 +64,7 @@ for compute_unit in compute_units
     local ∂LogJac∂dYdX_backw_test = adapt(compute_unit, reshape(readdlm("test_outputs/dljdd_backw.txt"), 11,1,10))
 
     @testset "rqs_forward_pullback_$compute_unit_type" begin
-        local δx, δpX, δpY, δdYdX = MonotonicSplines.rqs_pullback(MonotonicSplines.eval_forward_rqs_params_with_grad, x_test, pX,pY,dYdX, ones(size(x_test)...), ones(1,size(x_test,2)))
+        local δx, δpX, δpY, δdYdX = MonotonicSplines.rqs_pullback(MonotonicSplines.RQSForward(), x_test, pX,pY,dYdX, ones(size(x_test)...), ones(1,size(x_test,2)))
         @test all(isapprox.((δpX, δpY, δdYdX), rqs_forward_pullback_test))
         @test size(δx) == size(x_test)
     end
@@ -83,7 +83,7 @@ for compute_unit in compute_units
         δx_forw = zeros(size(x_test)...)
 
         forward_pbk_test = MonotonicSplines.rqs_pullback_kernel!(CPU(),4)
-        forward_pbk_test(MonotonicSplines.eval_forward_rqs_params_with_grad, x_test, y, logjac, δx_forw, pX, pY, dYdX, ∂y∂pX_forw, ∂y∂pY_forw, ∂y∂dYdX_forw, ∂LogJac∂pX_forw, ∂LogJac∂pY_forw, ∂LogJac∂dYdX_forw, tangent_x_forw, tangent_LogJac_forw, ndrange=size(x_test))
+        forward_pbk_test(MonotonicSplines.RQSForward(), x_test, y, logjac, δx_forw, pX, pY, dYdX, ∂y∂pX_forw, ∂y∂pY_forw, ∂y∂dYdX_forw, ∂LogJac∂pX_forw, ∂LogJac∂pY_forw, ∂LogJac∂dYdX_forw, tangent_x_forw, tangent_LogJac_forw, ndrange=size(x_test))
 
         @test isapprox(y, y_test) 
         @test isapprox(logjac, ladj_forward_test)
@@ -126,7 +126,7 @@ for compute_unit in compute_units
         δx_backw = zeros(size(x_test)...)
 
         inverse_pbk_test = MonotonicSplines.rqs_pullback_kernel!(CPU(),4)
-        inverse_pbk_test(MonotonicSplines.eval_inverse_rqs_params_with_grad, y_test, y, logjac, δx_backw, pX, pY, dYdX, ∂y∂pX_backw, ∂y∂pY_backw, ∂y∂dYdX_backw, ∂LogJac∂pX_backw, ∂LogJac∂pY_backw, ∂LogJac∂dYdX_backw, tangent_x_backw, tangent_LogJac_backw, ndrange=size(x_test))
+        inverse_pbk_test(MonotonicSplines.RQSInverse(), y_test, y, logjac, δx_backw, pX, pY, dYdX, ∂y∂pX_backw, ∂y∂pY_backw, ∂y∂dYdX_backw, ∂LogJac∂pX_backw, ∂LogJac∂pY_backw, ∂LogJac∂dYdX_backw, tangent_x_backw, tangent_LogJac_backw, ndrange=size(x_test))
 
         @test isapprox(y, x_test) 
         @test isapprox(logjac, ladj_inverse_test)
@@ -161,13 +161,13 @@ for compute_unit in compute_units
             local pX2, pY2, dYdX2 = MonotonicSplines.rqs_params_from_nn(vcat(nn_out, reverse(nn_out, dims=1)), 2)
             local x2 = vcat(x_test, reverse(x_test, dims=2))
 
-            for rqs_fun in (MonotonicSplines.rqs_forward, MonotonicSplines.rqs_inverse)
-                local eval_with_grad = rqs_fun === MonotonicSplines.rqs_forward ?
-                    MonotonicSplines.eval_forward_rqs_params_with_grad : MonotonicSplines.eval_inverse_rqs_params_with_grad
-
+            for (trafo, rqs_fun) in (
+                (MonotonicSplines.RQSForward(), MonotonicSplines.rqs_forward),
+                (MonotonicSplines.RQSInverse(), MonotonicSplines.rqs_inverse)
+            )
                 local δY = ones(size(x2))
                 local δlogJac = ones(1, size(x2,2))
-                local δx, δpX, δpY, δdYdX = MonotonicSplines.rqs_pullback(eval_with_grad, x2, pX2, pY2, dYdX2, δY, δlogJac)
+                local δx, δpX, δpY, δdYdX = MonotonicSplines.rqs_pullback(trafo, x2, pX2, pY2, dYdX2, δY, δlogJac)
 
                 local f_sum(x, pX, pY, dYdX) = sum(sum.(rqs_fun(x, pX, pY, dYdX)))
                 @test isapprox(δx, _fd_grad(x -> f_sum(x, pX2, pY2, dYdX2), x2), rtol = 1e-6)
@@ -176,16 +176,16 @@ for compute_unit in compute_units
                 @test isapprox(δdYdX, _fd_grad(p -> f_sum(x2, pX2, pY2, p), dYdX2), rtol = 1e-6, atol = 1e-8)
 
                 # tangent wrt x with only one of the two outputs used
-                local δx_y = MonotonicSplines.rqs_pullback(eval_with_grad, x2, pX2, pY2, dYdX2, δY, zero(δlogJac))[1]
+                local δx_y = MonotonicSplines.rqs_pullback(trafo, x2, pX2, pY2, dYdX2, δY, zero(δlogJac))[1]
                 @test isapprox(δx_y, _fd_grad(x -> sum(rqs_fun(x, pX2, pY2, dYdX2)[1]), x2), rtol = 1e-6)
-                local δx_lj = MonotonicSplines.rqs_pullback(eval_with_grad, x2, pX2, pY2, dYdX2, zero(δY), δlogJac)[1]
+                local δx_lj = MonotonicSplines.rqs_pullback(trafo, x2, pX2, pY2, dYdX2, zero(δY), δlogJac)[1]
                 @test isapprox(δx_lj, _fd_grad(x -> sum(rqs_fun(x, pX2, pY2, dYdX2)[2]), x2), rtol = 1e-6)
             end
 
             # outside the spline range the tangent wrt x is the identity's
             local x_out = [-7.0 7.0; 6.0 -6.0]
             local pX3, pY3, dYdX3 = (p[:,:,1:2] for p in (pX2, pY2, dYdX2))
-            local δx_out = MonotonicSplines.rqs_pullback(MonotonicSplines.eval_forward_rqs_params_with_grad, x_out, pX3, pY3, dYdX3, fill(2.0, size(x_out)), ones(1,2))[1]
+            local δx_out = MonotonicSplines.rqs_pullback(MonotonicSplines.RQSForward(), x_out, pX3, pY3, dYdX3, fill(2.0, size(x_out)), ones(1,2))[1]
             @test δx_out ≈ fill(2.0, size(x_out))
         end
     end

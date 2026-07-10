@@ -2,15 +2,14 @@
 
 # Non-public:
 #=
-    rqs_pullback(param_eval_function::Function, x::AbstractArray{<:Real}, pX::AbstractArray{<:Real}, pY::AbstractArray{<:Real}, dYdX::AbstractArray{<:Real}, tangent_1::AbstractArray, tangent_2::AbstractArray)
+    rqs_pullback(trafo::Union{RQSForward,RQSInverse}, x::AbstractArray{<:Real}, pX::AbstractArray{<:Real}, pY::AbstractArray{<:Real}, dYdX::AbstractArray{<:Real}, tangent_1::AbstractArray, tangent_2::AbstractArray)
 
-Compute the gradients of the rational quadratic spline functions characterized by `pX`, `pY`, and `dYdX`, evaluated at the values in `x` with respect to `pX`, `pY`, and `dYdX`. 
+Compute the gradients of the rational quadratic spline functions characterized by `pX`, `pY`, and `dYdX`, evaluated at the values in `x` with respect to `x`, `pX`, `pY`, and `dYdX`.
 
 This function is designed to make the transformation using Rational Quadratic Splines in this package automatically differentiable.
-Whether the gradients of the forward or inverse spline functions are calculated is determined by the `param_eval_function` argument.
 
 # Arguments
-- `param_eval_function`: The function used to evaluate a spline segment. Different functions are used for the forward and inverse spline functions.
+- `trafo`: The direction in which the splines are applied, `RQSForward()` or `RQSInverse()`.
 - `x`: An array of real numbers at which the spline functions are evaluated.
 - `pY`, `pY`, `dYdX`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively.
 - `tangent_1`, `tangent_2`: Arrays that hold the tangent vectors for the transformed output and the log abs det jacobians respectively.
@@ -33,14 +32,14 @@ the (generally non-zero) values `∂yⱼₖ/∂pXₗⱼₖ + ∂(log(abs(∂yⱼ
 The function executes in a kernel, on the same backend as `x` is stored (CPU or GPU), and the output is also returned on the same backend.
 =#
 function rqs_pullback(
-    param_eval_function::Function,
+    trafo::Union{RQSForward,RQSInverse},
     x::AbstractArray{<:Real},
     pX::AbstractArray{<:Real},
     pY::AbstractArray{<:Real},
     dYdX::AbstractArray{<:Real},
     tangent_1::AbstractArray{<:Real},
     tangent_2::AbstractArray{<:Real};
-) 
+)
     compute_unit = get_compute_unit(x)
     backend = ka_backend(compute_unit)
     kernel! = rqs_pullback_kernel!(backend, _ka_threads(backend)...)
@@ -58,7 +57,7 @@ function rqs_pullback(
     ∂LogJac∂dYdX = fill!(similar(dYdX), zero(eltype(dYdX)))
 
     kernel!(
-        param_eval_function,
+        trafo,
         x, y, logJac, δx,
         pX, pY, dYdX,
         ∂y∂pX, ∂y∂pY, ∂y∂dYdX,
@@ -75,7 +74,7 @@ end
 # Non-public:
 #=
     rqs_pullback_kernel(
-        param_eval_function::Function,
+        trafo::Union{RQSForward,RQSInverse},
         x::AbstractArray,
         y::AbstractArray,
         logJac::AbstractArray,
@@ -96,7 +95,7 @@ end
 This kernel function calculates the gradients of the rational quadratic spline functions characterized by `pX`, `pY`, and `dYdX`, evaluated at the values in `x` and of `logJac`.
 
 # Arguments
-- `param_eval_function` The function used to evaluate a spline segment. Different functions are used for the forward and inverse passes.
+- `trafo`: The direction in which the splines are applied, `RQSForward()` or `RQSInverse()`.
 - `x`: An array of real numbers to which the spline functions are applied.
 - `pX`, `pY`, `dYdX`: Arrays that hold the width, height, and derivative parameters of the spline functions, respectively.
 - `y`: An array where the transformed values are stored.
@@ -112,7 +111,7 @@ For an explanation of the shape and contents of the gradient arrays, see the doc
 This function is a kernel function and is used within the `rqs_forward_pullback` function to calculate the gradients of the spline functions and `logJac`. It is not intended to be called directly by the user.
 =#
 @kernel function rqs_pullback_kernel!(
-        param_eval_function::Function,
+        trafo::Union{RQSForward,RQSInverse},
         x::AbstractArray{<:Real},
         y::AbstractArray{<:Real},
         LogJac::AbstractArray{<:Real},
@@ -136,9 +135,8 @@ This function is a kernel function and is used within the `rqs_forward_pullback`
     K = size(pX, 1) - 1
 
     # Find the bin index
-    array_to_search = Base.ifelse(param_eval_function == eval_forward_rqs_params_with_grad, pX, pY)
-
-    k1 = searchsortedfirst_impl(view(array_to_search, :, i, j), x[i,j]) - 1
+    knots = _rqs_search_knots(trafo, pX, pY)
+    k1 = searchsortedfirst_impl(view(knots, :, i, j), x[i,j]) - 1
     k2 = one(typeof(k1))
 
     # Is inside of range
@@ -147,7 +145,7 @@ This function is a kernel function and is used within the `rqs_forward_pullback`
 
     x_tmp = Base.ifelse(isinside, x[i,j], pX[k,i,j]) # Simplifies calculations
 
-    (yᵢⱼ, LogJacᵢⱼ, ∂y∂pX, ∂y∂pY, ∂y∂dYdX, ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX, ∂LogJac∂x) = param_eval_function(pX[k,i,j], pX[k+1,i,j], pY[k,i,j], pY[k+1,i,j], dYdX[k,i,j], dYdX[k+1,i,j], x_tmp)
+    (yᵢⱼ, LogJacᵢⱼ, ∂y∂pX, ∂y∂pY, ∂y∂dYdX, ∂LogJac∂pX, ∂LogJac∂pY, ∂LogJac∂dYdX, ∂LogJac∂x) = _rqs_eval_params_with_grad(trafo, pX[k,i,j], pX[k+1,i,j], pY[k,i,j], pY[k+1,i,j], dYdX[k,i,j], dYdX[k+1,i,j], x_tmp)
 
     y[i,j] = Base.ifelse(isinside, yᵢⱼ, x[i,j])
     LogJac[i,j] = Base.ifelse(isinside, LogJacᵢⱼ, zero(typeof(LogJacᵢⱼ)))

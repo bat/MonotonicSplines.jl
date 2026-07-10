@@ -143,17 +143,17 @@ for compute_unit in compute_units
     end
 
     @testset "rqs_kernels_$compute_unit_type" begin
-        forward_kernel_test = MonotonicSplines.rqs_forward_kernel!(CPU(), 4)
+        apply_kernel_test = MonotonicSplines.rqs_apply_kernel!(CPU(), 4)
+
         y_kernel_test = zeros(size(x_test)...)
         ladj_forward_kernel_test = zeros(size(x_test)...)
-        forward_kernel_test(x_test, y_kernel_test, ladj_forward_kernel_test, pX,pY,dYdX, ndrange=size(x_test))
+        apply_kernel_test(MonotonicSplines.RQSForward(), x_test, y_kernel_test, ladj_forward_kernel_test, pX,pY,dYdX, ndrange=size(x_test))
         @test isapprox(y_kernel_test, y_test)
         @test isapprox(sum(ladj_forward_kernel_test, dims = 1), ladj_forward_test)
 
-        inverse_kernel_test = MonotonicSplines.rqs_inverse_kernel!(CPU(), 4)
         x_kernel_test = zeros(size(x_test)...)
         ladj_inverse_kernel_test = zeros(size(x_test)...)
-        inverse_kernel_test(y_test, x_kernel_test, ladj_inverse_kernel_test, pX,pY,dYdX, ndrange=size(x_test))
+        apply_kernel_test(MonotonicSplines.RQSInverse(), y_test, x_kernel_test, ladj_inverse_kernel_test, pX,pY,dYdX, ndrange=size(x_test))
 
         @test isapprox(x_kernel_test, x_test)
         @test isapprox(sum(ladj_inverse_kernel_test, dims = 1), ladj_inverse_test)
