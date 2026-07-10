@@ -7,7 +7,7 @@ Test.@testset "Package MonotonicSplines" begin
     include("test_utils.jl")
     include("test_rqspline.jl")
     include("test_rqspline_pullbacks.jl")
-    include("test_ad.jl")
+    include("test_purearray.jl")
     include("test_makie.jl")
     include("test_docs.jl")
     Test.@test isempty(Test.detect_ambiguities(MonotonicSplines))

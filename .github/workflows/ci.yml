@@ -61,6 +61,24 @@ jobs:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info
+  test-ad:
+    name: AD ${{ matrix.group }} - Julia 1 - ubuntu-latest - x64
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - mooncake
+          - enzyme
+          - reactant
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+          arch: x64
+      - uses: julia-actions/cache@v2
+      - run: julia --color=yes test/ad_${{ matrix.group }}/runtests.jl
   docs:
     name: Documentation
     runs-on: ubuntu-latest
