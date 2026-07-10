@@ -91,15 +91,16 @@ Process the raw output parameters of a neural network to generate parameters for
   The parameters are stored in a `K+1 x n_spline_functions_per_sample x n_samples` array.
 """
 function rqs_params_from_nn(θ_raw::AbstractArray, n_dims_trafo::Integer, B::Real = 5.)
+    T = float(eltype(θ_raw))
     N = size(θ_raw, 2)
     K = Int((size(θ_raw,1)/n_dims_trafo+1)/3)
     θ = reshape(θ_raw, :, n_dims_trafo, N)
 
     compute_unit = get_compute_unit(θ_raw)
 
-    pX =  cat(adapt(compute_unit, repeat([-B], 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[1:K,:,:])); dims = 1)
-    pY =  cat(adapt(compute_unit, repeat([-B], 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[K+1:2K,:,:])); dims = 1)
-    dYdX =  cat(adapt(compute_unit, repeat([1], 1, n_dims_trafo, N)), _softplus_tri(θ[2K+1:end,:,:]), adapt(compute_unit, repeat([1], 1, n_dims_trafo, N)); dims = 1)
+    pX =  cat(adapt(compute_unit, fill(T(-B), 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[1:K,:,:]), T(B)); dims = 1)
+    pY =  cat(adapt(compute_unit, fill(T(-B), 1, n_dims_trafo, N)), _cumsum_tri(_softmax_tri(θ[K+1:2K,:,:]), T(B)); dims = 1)
+    dYdX =  cat(adapt(compute_unit, fill(T(1), 1, n_dims_trafo, N)), _softplus_tri(θ[2K+1:end,:,:]), adapt(compute_unit, fill(T(1), 1, n_dims_trafo, N)); dims = 1)
 
     return pX, pY, dYdX
 end

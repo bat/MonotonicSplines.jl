@@ -38,6 +38,12 @@ end
 @testset "parameter_processing_functions" begin
     @test all(isapprox.(rqs_params_from_nn(test_nn_output, n_dims_to_transform), test_params_processed))
 
+    pX_B3, pY_B3, dYdX_B3 = rqs_params_from_nn(test_nn_output, n_dims_to_transform, 3.0)
+    @test all(isapprox.(extrema(pX_B3), (-3, 3))) && all(isapprox.(extrema(pY_B3), (-3, 3)))
+    @test all(pX_B3[1,:,:] .== -3) && all(dYdX_B3[1,:,:] .== 1) && all(dYdX_B3[end,:,:] .== 1)
+
+    @test all(eltype.(rqs_params_from_nn(Float32.(test_nn_output), n_dims_to_transform)) .=== Float32)
+
     @test isapprox(MonotonicSplines._softmax_tri(test_params_raw), softmax_tri_test_output)
     @test isapprox(MonotonicSplines._softmax(test_params_matrix), softmax_matrix_test_output)
     @test isapprox(MonotonicSplines._softmax(test_params_vector), softmax_vector_test_output)
